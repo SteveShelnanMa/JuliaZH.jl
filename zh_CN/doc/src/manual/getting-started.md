@@ -1,7 +1,7 @@
 # [入门](@id man-getting-started)
 
 无论是使用预编译好的二进制程序，还是自己从源码编译，安装 Julia 都是一件很简单的事情。
-请按照 [https://julialang.org/downloads/](https://julialang.org/downloads/) 的提示来下载和安装 Julia。
+请按照 [https://julialang.org/downloads/](https://julialang.org/downloads/) 的提示来下载并安装 Julia。
 
 启动一个交互式会话（也叫 REPL）是学习和尝试 Julia 最简单的方法。双击 Julia 的可执行文件或是从命令行运行 `julia` 就可以启动：
 
@@ -88,7 +88,7 @@ julia [switches] -- [programfile] [args...]
 |`-L`, `--load <file>`                  |立即在所有进程中载入 `<file>` |
 |`-p`, `--procs {N\|auto`}              |这里的整数 N 表示启动 N 个额外的工作进程；`auto` 表示启动与 CPU 线程数目（logical cores）一样多的进程|
 |`--machine-file <file>`                |在 `<file>` 中列出的主机上运行进程|
-|`-i`                                   |非交互式模式；REPL 运行且 `isinteractive()` 为 true|
+|`-i`                                   |交互式模式；REPL 运行且 `isinteractive()` 为 true|
 |`-q`, `--quiet`                        |安静的启动；REPL 启动时无横幅，不显示警告|
 |`--banner={yes\|no\|auto}`             |开启或关闭 REPL 横幅|
 |`--color={yes\|no\|auto}`              |开启或关闭文字颜色|

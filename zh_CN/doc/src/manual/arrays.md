@@ -40,7 +40,7 @@ Julia 提供了许多用于构造和初始化数组的函数。在下列函数�
 | [`deepcopy(A)`](@ref)                          | 深拷贝，即拷贝 `A`，并递归地拷贝其元素                                                                                                                                                                                                   |
 | [`similar(A, T, dims...)`](@ref)               | 一个与`A`具有相同类型（这里指的是密集，稀疏等）的未初始化数组，但具有指定的元素类型和维数。第二个和第三个参数都是可选的，如果省略则默认为元素类型和 `A` 的维数。 |
 | [`reinterpret(T, A)`](@ref)                    | 与 `A` 具有相同二进制数据的数组，但元素类型为 `T`                                                                                                                                                                         |
-| [`rand(T, dims...)`](@ref)                     | 一个随机 `Array`，元素值是``[0,1}``半开区间中的均匀分布且服从一阶独立同分布 [^1]                                                                                                                                       |
+| [`rand(T, dims...)`](@ref)                     | 一个随机 `Array`，元素值是 ``[0, 1)`` 半开区间中的均匀分布且服从一阶独立同分布 [^1]                                                                                                                                       |
 | [`randn(T, dims...)`](@ref)                    | 一个随机 `Array`，元素为标准正态分布，服从独立同分布                                                                                                                                                                         |
 | [`Matrix{T}(I, m, n)`](@ref)                   | `m` 行 `n` 列的单位矩阵                                                                                                                                                                                                                   |
 | [`range(start, stop=stop, length=n)`](@ref)    | 从 `start` 到 `stop` 的带有 `n` 个线性间隔元素的范围                                                                                                                                                                                 |
@@ -290,8 +290,7 @@ julia> A[[1, 2], [1], [1, 2], 1] # a mix of index types
 
 请注意最后两种情况下得到的数组大小为何是不同的。
 
-If `I_1` is changed to a two-dimensional matrix, then `X` becomes an `n+1`-dimensional array of
-shape `(size(I_1, 1), size(I_1, 2), length(I_2), ..., length(I_n))`. The matrix adds a dimension.
+如果 `I_1` 是二维矩阵，则 `X` 是 `n+1` 维数组，其形状为 `(size(I_1, 1), size(I_1, 2), length(I_2), ..., length(I_n))`。矩阵会添加一个维度。
 
 例如：
 
@@ -391,11 +390,11 @@ julia> x
 
 1. 标量索引。默认情况下，这包括：
     * 非布尔的整数
-    * [[`CartesianIndex {N}`](@ref)](@ref)s, which behave like an `N`-tuple of integers spanning multiple dimensions (see below for more details)
+    * [[`CartesianIndex {N}`](@ref)s，其行为类似于跨越多个维度的 `N` 维整数元组（详见下文）
 2. 标量索引数组。这包括：
     * 整数向量和多维整数数组
     * 像 `[]` 这样的空数组，它不选择任何元素
-    * 如 `a:c` 或 `a:b:c` 的范围，从 `a` 到 `c` （包括）选择连续或间隔的部分元素
+    * 如 `a:c` 或 `a:b:c` 的范围，从 `a` 到 `c`（包括）选择连续或间隔的部分元素
     * 任何自定义标量索引数组，它是 `AbstractArray` 的子类型
     * `CartesianIndex{N}` 数组（详见下文）
 3. 一个表示标量索引数组的对象，可以通过[`to_indices`](@ref)转换为这样的对象。 默认情况下，这包括：
@@ -657,7 +656,7 @@ julia> string.(1:3, ". ", ["First", "Second", "Third"])
 
 Julia 中的基本数组类型是抽象类型 [`AbstractArray{T,N}`](@ref)。它通过维数 `N` 和元素类型 `T` 进行参数化。[`AbstractVector`](@ref) 和 [`AbstractMatrix`](@ref) 是一维和二维情况下的别名。`AbstractArray` 对象的操作是使用更高级别的运算符和函数定义的，其方式独立于底层存储。 这些操作通常能以任何特定数组实现的备选来正常工作。
 
-`AbstractArray` 类型包含任何模糊类似的东西，它的实现可能与传统数组完全不同。例如，可以根据请求而不是存储来计算元素。但是，任何具体的 `AbstractArray{T,N}` 类型通常应该至少实现 [`size(A)`](@ref)（返回 `Int` 元组），[`getindex(A,i)`](@ref) 和 [`getindex(A,i1,...,iN)`](@ref getindex)；可变数组也应该实现 [`setindex!`](@ref)。建议这些操作具有几乎恒定的时间复杂度，或严格说来 Õ(1) 复杂性，否则某些数组函数可能出乎意料的慢。具体类型通常还应提供 [`similar(A,T=eltype(A),dims=size(A))`](@ref) 方法，用于为 [`copy`](@ref) 分配类似的数组和其他不正常的操作。无论在内部如何表示 `AbstractArray{T,N}`，`T` 是由* 整数 * 索引返回的对象类型（`A[1, ..., 1]`，当 `A` 不为空），`N` 应该是 [`size`](@ref) 返回的元组的长度。有关定义自定义 `AbstractArray` 实现的更多详细信息，请参阅[接口章节中的数组接口导则](@ref man-interface-array)。
+`AbstractArray` 类型包含任何模糊类似的东西，它的实现可能与传统数组完全不同。例如，可以根据请求而不是存储来计算元素。但是，任何具体的 `AbstractArray{T,N}` 类型通常应该至少实现 [`size(A)`](@ref)（返回 `Int` 元组），[`getindex(A,i)`](@ref) 和 [`getindex(A,i1,...,iN)`](@ref getindex)；可变数组也应该实现 [`setindex!`](@ref)。建议这些操作具有几乎恒定的时间复杂度，或严格说来 Õ(1) 复杂性，否则某些数组函数可能出乎意料的慢。具体类型通常还应提供 [`similar(A,T=eltype(A),dims=size(A))`](@ref) 方法，用于为 [`copy`](@ref) 分配类似的数组和其他不正常的操作。无论在内部如何表示 `AbstractArray{T,N}`，`T` 是由 *整数* 索引返回的对象类型（`A[1, ..., 1]`，当 `A` 不为空），`N` 应该是 [`size`](@ref) 返回的元组的长度。有关定义自定义 `AbstractArray` 实现的更多详细信息，请参阅[接口章节中的数组接口导则](@ref man-interface-array)。
 
 `DenseArray` 是 `AbstractArray` 的抽象子类型，旨在包含元素按列连续存储的所有数组（请参阅[性能建议](@ref man-performance-tips)中的附加说明）。[`Array`](@ref) 类型是 `DenseArray` 的特定实例，[`Vector`](@ref) 和 [`Matrix`](@ref) 是在一维和二维情况下的别名。除了所有 `AbstractArray` 所需的操作之外，很少有专门为 `Array` 实现的操作；大多数数组库都以通用方式实现，以保证所有自定义数组都具有相似功能。
 

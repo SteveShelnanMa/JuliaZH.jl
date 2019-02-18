@@ -82,7 +82,7 @@ julia> f(2, 3)
 1
 ```
 
-`2x + y` 定义只用于第一个情况，`2x - y` 定义用于其他的情况。没有使用任何自动的函数参数的指派或者类型转换：Julia中的所有转换都不是 magic 的，都是完全显式的。然而[类型转换和类型提升](@ref conversion-and-promotion)显示了足够先进的技术的智能应用能够与 magic 不可分辨到什么程度。[^Clark61] 对于非数字值，和比两个参数更多或者更少的情况，函数 `f` 并没有定义，应用会导致 [`MethodError`](@ref)：
+`2x + y` 定义只用于第一个情况，`2x - y` 定义用于其他的情况。没有使用任何自动的函数参数的指派或者类型转换：Julia中的所有转换都不是 magic 的，都是完全显式的。然而[类型转换和类型提升](@ref conversion-and-promotion)显示了足够先进的技术的智能应用能够与 magic 不可分辨到什么程度。[^Clarke61] 对于非数字值，和比两个参数更多或者更少的情况，函数 `f` 并没有定义，应用会导致 [`MethodError`](@ref)：
 
 ```jldoctest fofxy
 julia> f("foo", 3)
@@ -234,7 +234,7 @@ julia> same_type(Int32(1), Int64(2))
 false
 ```
 
-这样的定义对应着那些类型特征是`UnionAll`类型的方法（参见[UnionAll Types](@ref)）。
+这样的定义对应着那些类型签名是 `UnionAll` 类型的方法（参见[ UnionAll 类型](@ref)）。
 
 在Julia中这种通过分派进行函数行为的定义是十分常见的，甚至是惯用的。方法类型参数并不局限于用作参数的类型：他们可以用在任意地方，只要值会在函数或者函数体的特征中。这里有个例子，例子中方法类型参数`T`用作方法特征中的参数类型`Vector{T}`的类型参数：
 
@@ -280,7 +280,7 @@ julia> mytypeof(1.0)
 Float64
 ```
 
-就像你能在类型声明时通过类型参数对子类型进行约束一样（参见[Parametric Types](@ref)），你也可以约束方法的类型参数：
+就像你能在类型声明时通过类型参数对子类型进行约束一样（参见[参数类型](@ref)），你也可以约束方法的类型参数：
 
 ```jldoctest
 julia> same_type_numeric(x::T, y::T) where {T<:Number} = true
@@ -313,7 +313,7 @@ false
 
 `same_type_numeric`函数的行为与上面定义的`same_type`函数基本相似，但是它只对一对数定义。
 
-参数方法允许与`where`表达式同样的语法用来写类型（参见[UnionAll Types](@ref)）。如果只有一个参数，封闭的大括号（在`where {T}`中）可以省略，但是为了清楚起见推荐写上。多个参数可以使用逗号隔开，例如`where {T, S <: Real}`，或者使用嵌套的`where`来写，例如`where S<:Real where T`。
+参数方法允许与`where`表达式同样的语法用来写类型（参见[ UnionAll 类型](@ref)）。如果只有一个参数，封闭的大括号（在`where {T}`中）可以省略，但是为了清楚起见推荐写上。多个参数可以使用逗号隔开，例如`where {T, S <: Real}`，或者使用嵌套的`where`来写，例如`where S<:Real where T`。
 
 重定义方法
 ------------------

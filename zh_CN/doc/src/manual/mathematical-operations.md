@@ -128,13 +128,13 @@ julia> [1,2,3] .^ 3
  27
 ```
 
-具体来说，`a .^ b` 被解析为 [`dot` 调用](@ref man-vectorized) `(^).(a,b)`，这会执行 [broadcast](@ref Broadcasting) 操作：该操作能结合数组和标量、相同大小的数组（元素之间的运算）、甚至不同形状的数组（例如行、列向量结合生成矩阵）。更进一步，就像所有向量化的 `dot` 调用一样，这些 `dot` 运算符是**融合**的（fused）。例如，在计算表达式 `2 .* A.^2 .+ sin.(A)` 时，Julia 只对 `A` 进行做**一次**循环，遍历 `A` 中的每个元素 a 并计算 `2a^2 + sin(a)`。上诉表达式也可以用[`@.`](@ref @__dot__) 宏简写为 `@. 2A^2 + sin(A)`。特别的，类似 `f.(g.(x))` 的嵌套 `dot` 调用也是**融合**的，并且“相邻的”二元运算符表达式 `x .+ 3 .* x.^2` 可以等价转换为嵌套 `dot` 调用：`(+).(x, (*).(3, (^).(x, 2)))`。
+具体来说，`a .^ b` 被解析为 [`dot` 调用](@ref man-vectorized) `(^).(a,b)`，这会执行 [broadcast](@ref Broadcasting) 操作：该操作能结合数组和标量、相同大小的数组（元素之间的运算）、甚至不同形状的数组（例如行、列向量结合生成矩阵）。更进一步，就像所有向量化的 `dot` 调用一样，这些 `dot` 运算符是**融合**的（fused）。例如，在计算表达式 `2 .* A.^2 .+ sin.(A)` 时，Julia 只对 `A` 进行做**一次**循环，遍历 `A` 中的每个元素 a 并计算 `2a^2 + sin(a)`。上述表达式也可以用[`@.`](@ref @__dot__) 宏简写为 `@. 2A^2 + sin(A)`。特别的，类似 `f.(g.(x))` 的嵌套 `dot` 调用也是**融合**的，并且“相邻的”二元运算符表达式 `x .+ 3 .* x.^2` 可以等价转换为嵌套 `dot` 调用：`(+).(x, (*).(3, (^).(x, 2)))`。
 
 除了 `dot` 运算符，我们还有 `dot` 复合赋值运算符，类似 `a .+= b`（或者 `@. a += b`）会被解析成 `a .= a .+ b`，这里的 `.=` 是一个**融合**的 in-place 运算，更多信息请查看 [`dot` 文档](@ref man-vectorized)）。
 
-这个加点的语法，也能用在用户自定义的运算符上。For example, if you define `⊗(A,B) = kron(A,B)` to give a convenient infix syntax `A ⊗ B` for Kronecker products ([`kron`](@ref)), then `[A,B] .⊗ [C,D]` will compute `[A⊗C, B⊗D]` with no additional coding.
+这个点语法，也能用在用户自定义的运算符上。例如，通过定义 `⊗(A,B) = kron(A,B)` 可以为 Kronecker 积（[`kron`](@ref)）提供一个方便的中缀语法 `A ⊗ B`，那么配合点语法 `[A,B] .⊗ [C,D]` 就等价于 `[A⊗C, B⊗D]`。
 
-将点运算符用于数值字面量可能会导致歧义。`1.+x` 是表示 `1. + x` 呢还是  `1 .+ x` ？这叫人疑惑。因此不允许使用这种语法，遇到这种情况时，必须明确地用空格消除歧义。
+将点运算符用于数值字面量可能会导致歧义。例如，`1.+x` 到底是表示 `1. + x` 还是 `1 .+ x`？这会令人疑惑。因此不允许使用这种语法，遇到这种情况时，必须明确地用空格消除歧义。
 
 ## 数值比较
 
@@ -186,15 +186,15 @@ julia> 3 < -0.5
 false
 ```
 
-整数的比较以标准方式——按位比较，而浮点数的比较以 [IEEE 754 标准](https://en.wikipedia.org/wiki/IEEE_754-2008)。
+整数的比较方式是标准的按位比较，而浮点数的比较方式则遵循 [IEEE 754 标准](https://en.wikipedia.org/wiki/IEEE_754-2008)。
 
   * 有限数的大小顺序，和我们所熟知的相同。
   * `+0` 等于但不大于 `-0`.
   * `Inf` 等于自身，并且大于除了 `NaN` 外的所有数。
   * `-Inf` 等于自身，并且小于除了 `NaN` 外的所有数。
-  * `NaN` “不具有可比性”，它与任何数值（甚至包括它自己）做大小比较，结果都是 false；并且与任何数值（包括它自己）做不等比较，结果都为 true.
+  * `NaN` 不等于、不小于且不大于任何数值，包括它自己。
 
-`NaN` 的“不可比性”可能有点奇特，这里举例说明一下：
+`NaN` 不等于它自己这一点可能会令人感到惊奇，所以需要注意：
 
 ```jldoctest
 julia> NaN == NaN
@@ -210,14 +210,14 @@ julia> NaN > NaN
 false
 ```
 
-在做[数组](@ref man-multi-dim-arrays)比较时，`NaN` 的存在，会使比较结果变得很奇怪：
+由于 `NaN` 的存在，在做[数组](@ref man-multi-dim-arrays)比较时会特别头疼：
 
 ```jldoctest
 julia> [1 NaN] == [1 NaN]
 false
 ```
 
-为此，Julia 给这些 *非有限数* 提供了下面几个额外的测试函数。这些函数在有些情况下很有用处，比如在做 hash 比较时。
+为此，Julia 给这些特别的数提供了下面几个额外的测试函数。这些函数在某些情况下很有用处，比如在做 hash 比较时。
 
 | 函数                | 测试是否满足如下性质                  |
 |:----------------------- |:------------------------- |
@@ -251,21 +251,18 @@ false
 
 有符号整数、无符号整数以及浮点数之间的混合类型比较是很棘手的。开发者费了很大精力来确保 Julia 在这个问题上做的是正确的。
 
-对于其它类型，`isequal` 会默认调用 [`==`](@ref)，所以如果你想给自己的类型定义相等，那么就只需要为 [`==`](@ref) 增加一个方法。如果你想自己定义一个相等函数，你可能需要定义一个对应的 [`hash`](@ref) 方法，用于确保 `isequal(x,y)` 隐含着 `hash(x) == hash(y)`。
+对于其它类型，`isequal` 会默认调用 [`==`](@ref)，所以如果你想给自己的类型定义相等，那么就只需要为 [`==`](@ref) 增加一个方法。如果你想定义一个你自己的相等函数，你可能需要定义一个对应的 [`hash`](@ref) 方法，用于确保 `isequal(x,y)` 隐含着 `hash(x) == hash(y)`。
 
 ### 链式比较
 
-与其它语言不通，with the [notable exception of Python](https://en.wikipedia.org/wiki/Python_syntax_and_semantics#Comparison_operators)，Julia 允许链式比较：
+与其他多数语言不同，就像 [notable exception of Python](https://en.wikipedia.org/wiki/Python_syntax_and_semantics#Comparison_operators) 一样，Julia 允许链式比较：
 
 ```jldoctest
 julia> 1 < 2 <= 2 < 3 == 3 > 2 >= 1 == 1 < 3 != 5
 true
 ```
 
-Chaining comparisons is often quite convenient in numerical code. Chained comparisons use the
-`&&` operator for scalar comparisons, and the [`&`](@ref) operator for elementwise comparisons,
-which allows them to work on arrays. For example, `0 .< A .< 1` gives a boolean array whose entries
-are true where the corresponding elements of `A` are between 0 and 1.
+链式比较在写数值代码时特别方便，它使用 `&&` 运算符比较标量，数组则用 [`&`](@ref) 进行按元素比较。比如，`0 .< A .< 1` 会得到一个 boolean 数组，如果 `A` 的元素都在 0 和 1 之间则数组元素就都是 true。
 
 注意链式比较的执行顺序：
 
@@ -285,22 +282,14 @@ julia> v(1) > v(2) <= v(3)
 false
 ```
 
-The middle expression is only evaluated once, rather than twice as it would be if the expression
-were written as `v(1) < v(2) && v(2) <= v(3)`. However, the order of evaluations in a chained
-comparison is undefined. It is strongly recommended not to use expressions with side effects (such
-as printing) in chained comparisons. If side effects are required, the short-circuit `&&` operator
-should be used explicitly (see [Short-Circuit Evaluation](@ref)).
+中间的表达式只会计算一次，而如果写成 `v(1) < v(2) && v(2) <= v(3)` 是计算了两次的。然而，链式比较中的顺序是不确定的。强烈建议不要在表达式中使用有副作用（比如 printing）的函数。如果的确需要，请使用短路运算符 `&&`（请参考[短路求值](@ref)）。
 
 ### 初等函数
 
-Julia provides a comprehensive collection of mathematical functions and operators. These mathematical
-operations are defined over as broad a class of numerical values as permit sensible definitions,
-including integers, floating-point numbers, rationals, and complex numbers,
-wherever such definitions make sense.
+Julia 提供了强大的数学函数和运算符集合。这些数学运算定义在各种合理的数值上，包括整型、浮点数、分数和复数，只要这些定义有数学意义就行。
 
-Moreover, these functions (like any Julia function) can be applied in "vectorized" fashion to
-arrays and other collections with the [dot syntax](@ref man-vectorized) `f.(A)`,
-e.g. `sin.(A)` will compute the sine of each element of an array `A`.
+而且，和其它 Julia 函数一样，这些函数也能通过 [点语法](@ref man-vectorized) `f.(A)` 以“向量化”的方式作用于数组和其它集合上。
+比如，`sin.(A)` 会计算 `A` 中每个元素的 sin 值。
 
 ## 运算符的优先级与结合性
 
@@ -324,15 +313,14 @@ e.g. `sin.(A)` will compute the sine of each element of an array `A`.
 | 赋值    | `= += -= *= /= //= \= ^= ÷= %= \|= &= ⊻= <<= >>= >>>=`                                            | 右结合                      |
 
 [^1]:
-    The unary operators `+` and `-` require explicit parentheses around their argument to disambiguate them from the operator `++`, etc. Other compositions of unary operators are parsed with right-associativity, e. g., `√√-a` as `√(√(-a))`.
+    一元运算符 `+` 和 `-` 需要显式调用，即给它们的参数加上括号，以免和 `++` 等运算符混淆。其它一元运算符的混合使用都被解析为右结合的，比如 `√√-a` 解析为 `√(√(-a))`。
 [^2]:
     The operators `+`, `++` and `*` are non-associative. `a + b + c` is parsed as `+(a, b, c)` not `+(+(a, b),
     c)`. However, the fallback methods for `+(a, b, c, d...)` and `*(a, b, c, d...)` both default to left-associative evaluation.
 
-For a complete list of *every* Julia operator's precedence, see the top of this file:
-[`src/julia-parser.scm`](https://github.com/JuliaLang/julia/blob/master/src/julia-parser.scm)
+要看**全部** Julia 运算符的优先级关系，可以看这个文件的最上面部分：[`src/julia-parser.scm`](https://github.com/JuliaLang/julia/blob/master/src/julia-parser.scm)
 
-You can also find the numerical precedence for any given operator via the built-in function `Base.operator_precedence`, where higher numbers take precedence:
+你也可以通过内置函数 `Base.operator_precedence` 查看任何给定运算符的优先级数值，数值越大优先级越高：
 
 ```jldoctest
 julia> Base.operator_precedence(:+), Base.operator_precedence(:*), Base.operator_precedence(:.)
@@ -342,7 +330,7 @@ julia> Base.operator_precedence(:sin), Base.operator_precedence(:+=), Base.opera
 (0, 1, 1)
 ```
 
-A symbol representing the operator associativity can also be found by calling the built-in function `Base.operator_associativity`:
+另外，内置函数 `Base.operator_associativity` 可以返回运算符结合性的符号表示：
 
 ```jldoctest
 julia> Base.operator_associativity(:-), Base.operator_associativity(:+), Base.operator_associativity(:^)
@@ -352,24 +340,22 @@ julia> Base.operator_associativity(:⊗), Base.operator_associativity(:sin), Bas
 (:left, :none, :right)
 ```
 
-Note that symbols such as `:sin` return precedence `0`. This value represents invalid operators and not
-operators of lowest precedence. Similarly, such operators are assigned associativity `:none`.
+注意诸如 `:sin` 这样的符号返回优先级 `0`，此值代表无效的运算符或非最低优先级运算符。类似地，它们的结合性被认为是 `:none`。
 
 ## 数值转换
 
-Julia supports three forms of numerical conversion, which differ in their handling of inexact
-conversions.
+Julia 支持三种数值转换，它们在处理不精确转换上有所不同。
 
-  * The notation `T(x)` or `convert(T,x)` converts `x` to a value of type `T`.
+  *  `T(x)` 和 `convert(T,x)` 都会把 `x` 转换为 `T`类型。
 
-      * If `T` is a floating-point type, the result is the nearest representable value, which could be
-        positive or negative infinity.
+      * 如果 `T` 是浮点类型，转换的结果就是最近的可表示值，
+        可能会是正负无穷大。
       * 如果 `T` 为整数类型，当 `x` 不为 `T` 类型时，会触发 `InexactError`
-  * `x % T` converts an integer `x` to a value of integer type `T` congruent to `x` modulo `2^n`,
-    where `n` is the number of bits in `T`. In other words, the binary representation is truncated
-    to fit.
-  * The [Rounding functions](@ref) take a type `T` as an optional argument. For example, `round(Int,x)`
-    is a shorthand for `Int(round(x))`.
+  * `x % T` 将整数 `x` 转换为整型 `T`，与 `x` 模 `2^n` 的结果一致，其中 `n` 是 `T` 的位数。换句话说，如果用二进制表示是被砍掉一部分的。
+     
+     
+  * [舍入函数](@ref) 接收一个 `T` 类型的可选参数。比如，`round(Int,x)`
+    是 `Int(round(x))` 的简写版。
 
 下面的例子展示了不同的形式
 
@@ -420,10 +406,10 @@ Stacktrace:
 | [`round(T, x)`](@ref) | `x` 舍到最接近的整数 | `T`         |
 | [`floor(x)`](@ref)    | `x` 舍到`-Inf`         | `typeof(x)` |
 | [`floor(T, x)`](@ref) | `x` 舍到`-Inf`         | `T`         |
-| [`ceil(x)`](@ref)     | round `x` towards `+Inf`         | `typeof(x)` |
-| [`ceil(T, x)`](@ref)  | round `x` towards `+Inf`         | `T`         |
-| [`trunc(x)`](@ref)    | round `x` towards zero           | `typeof(x)` |
-| [`trunc(T, x)`](@ref) | round `x` towards zero           | `T`         |
+| [`ceil(x)`](@ref)     | `x` 向 `+Inf` 方向取整         | `typeof(x)` |
+| [`ceil(T, x)`](@ref)  | `x` 向 `+Inf` 方向取整         | `T`         |
+| [`trunc(x)`](@ref)    | `x` 向 0 取整           | `typeof(x)` |
+| [`trunc(T, x)`](@ref) | `x` 向 0 取整           | `T`         |
 
 ### 除法函数
 
@@ -448,7 +434,7 @@ Stacktrace:
 | [`abs(x)`](@ref)        | `x` 的模                 |
 | [`abs2(x)`](@ref)       | `x` 的模的平方                               |
 | [`sign(x)`](@ref)       | 表示 `x` 的符号，返回 -1，0，或 +1          |
-| [`signbit(x)`](@ref)    | 表示符号位是开启的(true)或关闭的(false) |
+| [`signbit(x)`](@ref)    | 表示符号位是 true 或 false |
 | [`copysign(x,y)`](@ref) | 返回一个数，其值等于 `x` 的模，符号与 `y` 一致      |
 | [`flipsign(x,y)`](@ref) | 返回一个数，其值等于 `x` 的模，符号与 `x*y` 一致    |
 
@@ -467,16 +453,16 @@ Stacktrace:
 | [`log2(x)`](@ref)        | 以 2 为底 `x` 的对数                                                    |
 | [`log10(x)`](@ref)       | 以 10 为底 `x` 的对数                                                   |
 | [`log1p(x)`](@ref)       | 当 `x`接近 0 时的 `log(1+x)` 的精确值                                      |
-| [`exponent(x)`](@ref)    | binary exponent of `x`                                                     |
-| [`significand(x)`](@ref) | binary significand (a.k.a. mantissa) of a floating-point number `x`        |
+| [`exponent(x)`](@ref)    | `x` 的二进制指数                                                     |
+| [`significand(x)`](@ref) | 浮点数 `x` 的二进制有效数（也就是尾数）        |
 
-For an overview of why functions like [`hypot`](@ref), [`expm1`](@ref), and [`log1p`](@ref)
-are necessary and useful, see John D. Cook's excellent pair of blog posts on the subject: [expm1, log1p, erfc](https://www.johndcook.com/blog/2010/06/07/math-library-functions-that-seem-unnecessary/),
-and [hypot](https://www.johndcook.com/blog/2010/06/02/whats-so-hard-about-finding-a-hypotenuse/).
+想大概了解一下为什么诸如 [`hypot`](@ref)、[`expm1`](@ref)和 [`log1p`](@ref)
+函数是必要和有用的，可以看一下 John D. Cook 关于这些主题的两篇优秀博文：[expm1, log1p, erfc](https://www.johndcook.com/blog/2010/06/07/math-library-functions-that-seem-unnecessary/)，
+和 [hypot](https://www.johndcook.com/blog/2010/06/02/whats-so-hard-about-finding-a-hypotenuse/)。
 
 ### 三角和双曲函数
 
-All the standard trigonometric and hyperbolic functions are also defined:
+所有标准的三角函数和双曲函数也都已经定义了：
 
 ```
 sin    cos    tan    cot    sec    csc
@@ -486,15 +472,14 @@ asinh  acosh  atanh  acoth  asech  acsch
 sinc   cosc
 ```
 
-These are all single-argument functions, with [`atan`](@ref) also accepting two arguments
-corresponding to a traditional [`atan2`](https://en.wikipedia.org/wiki/Atan2) function.
+所有这些函数都是单参数函数，不过 [`atan`](@ref) 也可以接收两个参数
+来表示传统的 [`atan2`](https://en.wikipedia.org/wiki/Atan2) 函数。
 
-Additionally, [`sinpi(x)`](@ref) and [`cospi(x)`](@ref) are provided for more accurate computations
-of [`sin(pi*x)`](@ref) and [`cos(pi*x)`](@ref) respectively.
+另外，[`sinpi(x)`](@ref) 和 [`cospi(x)`](@ref) 分别用来对 [`sin(pi*x)`](@ref) 和 [`cos(pi*x)`](@ref) 进行更精确的计算。
 
-In order to compute trigonometric functions with degrees instead of radians, suffix the function
-with `d`. For example, [`sind(x)`](@ref) computes the sine of `x` where `x` is specified in degrees.
-The complete list of trigonometric functions with degree variants is:
+要计算角度而非弧度的三角函数，以 `d` 做后缀。
+比如，[`sind(x)`](@ref) 计算 `x` 的 sine 值，其中 `x` 是一个角度值。
+下面是角度变量的三角函数完整列表：
 
 ```
 sind   cosd   tand   cotd   secd   cscd
