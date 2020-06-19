@@ -16,7 +16,7 @@ julia> abs(missing)
 missing
 ```
 
-由于 `missing` 是个普通的 Julia 对象，此传播规则仅适用于已选择实现此行为的函数。这可通过为 `Missing` 类型的参数定义特定的方法来实现，或者简单地通过接受此类型的参数，并将它们传给会传播它们的函数（如标准运算符）来实现。包在定义新函数时应考虑其传播缺失值是否有意义，如果是这种情况，则应适当地定义方法。将 `missing` 值传给一个函数，若该函数没有定义接受类型为 `Missing` 的参数的方法，则抛出一个 `MethodError`，就像任何其它类型。
+由于 `missing` 是个普通的 Julia 对象，此传播规则仅适用于已选择实现此行为的函数。这可通过为 `Missing` 类型的参数定义特定的方法来实现，或者简单地通过接受此类型的参数，并将它们传给会传播它们的函数（如标准运算符）来实现。包在定义新函数时应考虑其传播缺失值是否有意义，如果是这种情况，则应适当地定义方法。将 `missing` 值传给一个函数，若该函数没有定义接受类型为 `Missing` 的参数的方法，则抛出一个 [`MethodError`](@ref)，就像任何其它类型。
 
 ## 相等和比较运算符
 
@@ -135,7 +135,7 @@ missing
 
 ## 流程控制和短路运算符
 
-流程控制操作符，包括 [`if`](@ref)、[`while`](@ref) 和[三元运算符](@ref man-conditional-evaluation) `x ? y : z`，不允许缺失值。这是因为如果我们能够观察实际值，它是 `true` 还是 `false` 是不确定的，这意味着我们不知道程序应该如何运行。一旦在以下上下文中遇到 `missing` 值，就会抛出 `TypeError`
+流程控制操作符，包括 [`if`](@ref)、[`while`](@ref) 和[三元运算符](@ref man-conditional-evaluation) `x ? y : z`，不允许缺失值。这是因为如果我们能够观察实际值，它是 `true` 还是 `false` 是不确定的，这意味着我们不知道程序应该如何运行。一旦在以下上下文中遇到 `missing` 值，就会抛出 [`TypeError`](@ref)
 ```jldoctest
 julia> if missing
            println("here")
@@ -218,21 +218,54 @@ julia> sum(skipmissing([1, missing]))
 1
 ```
 
-下面这个函数很方便，它返回一个迭代器，能高效地过滤掉 `missing` 值。因此，它可与任何支持迭代器的函数一起使用
-```jldoctest; setup = :(using Statistics)
-julia> maximum(skipmissing([3, missing, 2, 1]))
+This convenience function returns an iterator which filters out `missing` values
+efficiently. It can therefore be used with any function which supports iterators
+```jldoctest skipmissing; setup = :(using Statistics)
+julia> x = skipmissing([3, missing, 2, 1])
+Base.SkipMissing{Array{Union{Missing, Int64},1}}(Union{Missing, Int64}[3, missing, 2, 1])
+
+julia> maximum(x)
 3
 
-julia> mean(skipmissing([3, missing, 2, 1]))
+julia> mean(x)
 2.0
 
-julia> mapreduce(sqrt, +, skipmissing([3, missing, 2, 1]))
+julia> mapreduce(sqrt, +, x)
 4.146264369941973
 ```
 
-我们可以使用 [`collect`](@ref) 来提取 non-`missing` 值，并将它们存入一个数组
-```jldoctest
-julia> collect(skipmissing([3, missing, 2, 1]))
+Objects created by calling `skipmissing` on an array can be indexed using indices
+from the parent array. Indices corresponding to missing values are not valid for
+these objects and an error is thrown when trying to use them (they are also skipped
+by `keys` and `eachindex`)
+```jldoctest skipmissing
+julia> x[1]
+3
+
+julia> x[2]
+ERROR: MissingException: the value at index (2,) is missing
+[...]
+```
+
+This allows functions which operate on indices to work in combination with `skipmissing`.
+This is notably the case for search and find functions, which return indices
+valid for the object returned by `skipmissing` which are also the indices of the
+matching entries *in the parent array*
+```jldoctest skipmissing
+julia> findall(==(1), x)
+1-element Array{Int64,1}:
+ 4
+
+julia> findfirst(!iszero, x)
+1
+
+julia> argmax(x)
+1
+```
+
+Use [`collect`](@ref) to extract non-`missing` values and store them in an array
+```jldoctest skipmissing
+julia> collect(x)
 3-element Array{Int64,1}:
  3
  2
@@ -241,7 +274,7 @@ julia> collect(skipmissing([3, missing, 2, 1]))
 
 ## 数组上的逻辑运算
 
-上面描述的逻辑运算符的三值逻辑也适用于针对数组的函数。因此，使用 [`==`](@ref) 运算符的数组相等性测试一旦其结果无法在不知道 `missing` 条目实际值的情况下确定，就返回 `missing`。在应用中，这意味着在待比较数组的所有非缺失值都相等，但某个或全部数组包含缺失值（也许在不同位置）时会返回 `missing`。
+上面描述的逻辑运算符的三值逻辑也适用于针对数组的函数。因此，使用 [`==`](@ref) 运算符的数组相等性测试中，若在未知 `missing` 条目实际值时无法确定结果，就返回 `missing`。在实际应用中意味着，在待比较数组中所有非缺失值都相等，且某个或全部数组包含缺失值（也许在不同位置）时会返回 `missing`。
 ```jldoctest
 julia> [1, missing] == [2, missing]
 false

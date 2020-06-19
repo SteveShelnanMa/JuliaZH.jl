@@ -1,6 +1,6 @@
 # [函数](@id man-functions)
 
-在Julia里，函数是一个将参数值元组映射到返回值的对象。Julia的函数不是纯粹的数学函数，在某种意义上，函数可以改变并受程序的全局状态的影响。在Julia中定义函数的基本语法是：
+在 Julia 里，函数是一个将参数值元组映射到返回值的对象。Julia 的函数不是纯粹的数学函数，在某种意义上，函数可以改变并受程序的全局状态的影响。在Julia中定义函数的基本语法是：
 
 ```jldoctest
 julia> function f(x,y)
@@ -9,14 +9,17 @@ julia> function f(x,y)
 f (generic function with 1 method)
 ```
 
-在Julia中定义函数还有第二种更简洁的语法。上述的传统函数声明语法等效于以下紧凑性的“赋值形式”：
+This function accepts two arguments `x` and `y` and returns the value
+of the last expression evaluated, which is `x + y`.
+
+在 Julia 中定义函数还有第二种更简洁的语法。上述的传统函数声明语法等效于以下紧凑性的“赋值形式”：
 
 ```jldoctest fofxy
 julia> f(x,y) = x + y
 f (generic function with 1 method)
 ```
 
-尽管函数可以是复合表达式 (见 [Compound Expressions](@ref man-compound-expressions))，但在赋值形式下，函数体必须是一个一行的表达式。简短的函数定义在Julia中是很常见的。非常惯用的短函数语法大大减少了打字和视觉方面的干扰。
+尽管函数可以是复合表达式 (见 [复合表达式](@ref man-compound-expressions))，但在赋值形式下，函数体必须是一个一行的表达式。简短的函数定义在 Julia 中是很常见的。非常惯用的短函数语法大大减少了打字和视觉方面的干扰。
 
 使用传统的括号语法调用函数：
 
@@ -25,7 +28,7 @@ julia> f(2,3)
 5
 ```
 
-没有括号时，表达式`f`指的是函数对象，可以像任何值一样被传递：
+没有括号时，表达式 `f` 指的是函数对象，可以像任何值一样被传递：
 
 ```jldoctest fofxy
 julia> g = f;
@@ -34,7 +37,7 @@ julia> g(2,3)
 5
 ```
 
-和变量名一样，Unicode字符也可以用作函数名：
+和变量名一样，Unicode 字符也可以用作函数名：
 
 ```jldoctest
 julia> ∑(x,y) = x + y
@@ -46,11 +49,16 @@ julia> ∑(2, 3)
 
 ## 参数传递行为
 
-Julia函数参数遵循有时称为“pass-by-sharing”的约定，这意味着变量在被传递给函数时其值并不会被复制。函数参数本身充当新的变量绑定（指向变量值的新地址），它们所指向的值与所传递变量的值完全相同。调用者可以看到对函数内可变值（如数组）的修改。这与Scheme，大多数Lisps，Python，Ruby和Perl以及其他动态语言中的行为相同。
+Julia 函数参数遵循有时称为 “pass-by-sharing” 的约定，这意味着变量在被传递给函数时其值并不会被复制。函数参数本身充当新的变量绑定（指向变量值的新地址），它们所指向的值与所传递变量的值完全相同。调用者可以看到对函数内可变值（如数组）的修改。这与 Scheme，大多数 Lisps，Python，Ruby 和 Perl 以及其他动态语言中的行为相同。
 
 ## `return` 关键字
 
-函数返回的值是最后计算的表达式的值，默认情况下，它是函数定义主体中的最后一个表达式。在示例函数中`f`，从上一节开始，这是表达式的 `x + y`值。与在C和大多数其他命令式或函数式语言中一样，`return`关键字会导致函数立即返回，从而提供返回值的表达式：
+The value returned by a function is the value of the last expression evaluated, which, by default,
+is the last expression in the body of the function definition. In the example function, `f`, from
+the previous section this is the value of the expression `x + y`.
+As an alternative, as in many other languages,
+the `return` keyword causes a function to return immediately, providing
+an expression whose value is returned:
 
 ```julia
 function g(x,y)
@@ -78,9 +86,9 @@ julia> g(2,3)
 6
 ```
 
-当然，在一个单纯的线性执行的函数体内，例如 `g`，使用`return` 是没有意义的，因为表达式`x + y`永远不会被执行到，我们可以简单地把`x * y` 写为最后一个表达式从而省略掉`return`。
-然而在使用其他控制流程的函数体内，`return`却是有用的。
-例如，一个计算两条边长分别为`x`和`y`的三角形的斜边长度时可以避免overflow：
+当然，在一个单纯的线性执行的函数体内，例如 `g`，使用 `return` 是没有意义的，因为表达式 `x + y` 永远不会被执行到，我们可以简单地把 `x * y` 写为最后一个表达式从而省略掉 `return`。
+然而在使用其他控制流程的函数体内，`return` 却是有用的。
+例如，在计算两条边长分别为 `x` 和 `y` 的三角形的斜边长度时可以避免溢出：
 
 ```jldoctest
 julia> function hypot(x,y)
@@ -102,9 +110,12 @@ julia> hypot(3, 4)
 5.0
 ```
 
-这个函数有三个可能的返回处，返回三个不同表达式的值，具体取决于`x`和`y`的值。 最后一行的`return`可以省略，因为它是最后一个表达式。
+这个函数有三个可能的返回处，返回三个不同表达式的值，具体取决于 `x` 和 `y` 的值。 最后一行的 `return` 可以省略，因为它是最后一个表达式。
 
-也可以使用`::`运算符在函数声明中指定返回类型。 这可以将返回值转换为指定的类型。
+### 返回类型
+
+A return type can be specified in the function declaration using the `::` operator. This converts
+the return value to the specified type.
 
 ```jldoctest
 julia> function g(x, y)::Int8
@@ -115,7 +126,31 @@ julia> typeof(g(1, 2))
 Int8
 ```
 
-这个函数将忽略`x` 和`y`的类型，返回`Int8`类型的值。有关返回类型的更多信息，请参见 [类型声明](@ref)。
+这个函数将忽略 `x` 和 `y` 的类型，返回 `Int8` 类型的值。有关返回类型的更多信息，请参见[类型声明](@ref)。
+
+### Returning nothing
+
+For functions that do not need to return a value (functions used only for some side effects),
+the Julia convention is to return the value [`nothing`](@ref):
+
+```julia
+function printx(x)
+    println("x = $x")
+    return nothing
+end
+```
+
+This is a *convention* in the sense that `nothing` is not a Julia keyword
+but a only singleton object of type `Nothing`.
+Also, you may notice that the `printx` function example above is contrived,
+because `println` already returns `nothing`, so that the `return` line is redundant.
+
+There are two possible shortened forms for the `return nothing` expression.
+On the one hand, the `return` keyword implicitly returns `nothing`, so it can be used alone.
+On the other hand, since functions implicitly return their last expression evaluated,
+`nothing` can be used alone when it's the last expression.
+The preference for the expression `return nothing` as opposed to `return` or `nothing`
+alone is a matter of coding style.
 
 ## 操作符也是函数
 
@@ -192,6 +227,24 @@ julia> map(x -> x^2 + 2x - 1, [1,3,-1])
 ```
 
 接受多个参数的匿名函数写法可以使用语法 `(x,y,z)->2x+y-z`，而无参匿名函数写作 `()->3` 。无参函数的这种写法看起来可能有些奇怪，不过它对于延迟计算很有必要。这种用法会把代码块包进一个无参函数中，后续把它当做 `f` 调用。
+
+As an example, consider this call to [`get`](@ref):
+
+```julia
+get(dict, key) do
+    # default value calculated here
+    time()
+end
+```
+
+上面的代码等效于使用包含代码的匿名函数调用`get`。 被包围在do和end之间，如下所示
+
+```julia
+get(()->time(), dict, key)
+```
+
+The call to [`time`](@ref) is delayed by wrapping it in a 0-argument anonymous function
+that is called only when the requested key is absent from `dict`.
 
 ## 元组
 
@@ -316,7 +369,7 @@ julia> bar(1,2,3,4,5,6)
 
 在所有这些情况下，`x` 被绑定到传递给 `bar` 的尾随值的元组。
 
-也可以限制可以传递给函数的参数的数量，这部分内容稍后在  [Parametrically-constrained Varargs methods](@ref)  中讨论。
+也可以限制可以传递给函数的参数的数量，这部分内容稍后在  [参数化约束的可变参数方法](@ref)  中讨论。
 
 另一方面，将可迭代集中包含的值拆解为单独的参数进行函数调用通常很方便。 要实现这一点，需要在函数调用中额外使用 `...` 而不仅仅只是变量：
 
@@ -422,7 +475,7 @@ julia> Date(2000)
 2000-01-01
 ```
 
-可选参数实际上只是一种方便的语法，用于编写多种具有不同数量参数的方法定义（请参阅 [Note on Optional and keyword Arguments](@ref)）。这可通过调用 `methods` 函数来检查我们的 `Date` 函数示例。
+可选参数实际上只是一种方便的语法，用于编写多种具有不同数量参数的方法定义（请参阅 [可选参数和关键字的参数的注意事项](@ref)）。这可通过调用 `methods` 函数来检查我们的 `Date` 函数示例。
 
 ## 关键字参数
 
@@ -440,7 +493,7 @@ end
 
 在函数调用时，分号是可选的：可以调用 `plot(x, y, width=2)` 或 `plot(x, y; width=2)`，但前者的风格更为常见。显式的分号只有在传递可变参数或下文中描述的需计算的关键字时是必要的。
 
-关键字参数的默认值只在必须时求值（当相应的关键字参数没有被传入），并且按从左到右的顺序求值，因为默认值的表达式可能会参照先前的关键字参数。
+关键字参数的默认值只在必需时求值（当相应的关键字参数没有被传入），并且按从左到右的顺序求值，因为默认值的表达式可能会参照先前的关键字参数。
 
 关键字参数的类型可以通过如下的方式显式指定：
 
@@ -458,7 +511,9 @@ function f(x; y=0, kwargs...)
 end
 ```
 
-如果一个关键字参数在方法定义中未指定默认值，那么它就是*必须的*：如果调用者没有为其赋值，那么将会抛出一个 [`UndefKeywordError`](@ref) 异常：
+在 `f` 内部，`kwargs` 会是一个具名元组。具名元组（以及键类型为 `Symbol` 的字典）可作为关键字参数传递，这通过在调用中使用分号，例如 `f(x, z=1; kwargs...)`。
+
+如果一个关键字参数在方法定义中未指定默认值，那么它就是*必需的*：如果调用者没有为其赋值，那么将会抛出一个 [`UndefKeywordError`](@ref) 异常：
 ```julia
 function f(x; y)
     ###
@@ -466,8 +521,6 @@ end
 f(3, y=5) # ok, y is assigned
 f(3)      # throws UndefKeywordError(:y)
 ```
-
-在 `f` 内部，`kwargs` 会是一个具名元组。具名元组（以及字典）可作为关键字参数传递，通过在调用中使用分号，例如 `f(x, z=1; kwargs...)`。
 
 在分号后也可传递 `key => value` 表达式。例如，`plot(x, y; :width => 2)` 等价于 `plot(x, y, width=2)`。当关键字名称需要在运行时被计算时，这就很实用了。
 
@@ -541,12 +594,70 @@ function open(f::Function, args...)
 end
 ```
 
-在这里，[`open`](@ref) 首先打开要写入的文件，接着将结果输出流传递给你在 `do ... end` 代码快中定义的匿名函数。在你的函数退出后，[`open`](@ref) 将确保流被正确关闭，无论你的函数是正常退出还是抛出了一个异常（`try/finally` 结构会在 [Control Flow](@ref) 中描述）。
+在这里，[`open`](@ref) 首先打开要写入的文件，接着将结果输出流传递给你在 `do ... end` 代码快中定义的匿名函数。在你的函数退出后，[`open`](@ref) 将确保流被正确关闭，无论你的函数是正常退出还是抛出了一个异常（`try/finally` 结构会在 [流程控制](@ref) 中描述）。
 
 使用 `do` 代码块语法时，查阅文档或实现有助于了解用户函数的参数是如何初始化的。
 
-与任何其它内部函数一样，`do` 代码块可以从包含它的作用域里「捕获」变量。例如，在上例的 `open...do` 中，`data` 变量是从外部作用域中捕获的。捕获变量也许会带来在 [performance tips](@ref man-performance-tips) 中讨论的性能挑战。
+A `do` block, like any other inner function, can "capture" variables from its
+enclosing scope. For example, the variable `data` in the above example of
+`open...do` is captured from the outer scope. Captured variables
+can create performance challenges as discussed in [performance tips](@ref man-performance-captured).
 
+## Function composition and piping
+
+Functions in Julia can be combined by composing or piping (chaining) them together.
+
+Function composition is when you combine functions together and apply the resulting composition to arguments.
+You use the function composition operator (`∘`) to compose the functions, so `(f ∘ g)(args...)` is the same as `f(g(args...))`.
+
+You can type the composition operator at the REPL and suitably-configured editors using `\circ<tab>`.
+
+For example, the `sqrt` and `+` functions can be composed like this:
+
+```jldoctest
+julia> (sqrt ∘ +)(3, 6)
+3.0
+```
+
+这个语句先把数字相加，再对结果求平方根。
+
+The next example composes three functions and maps the result over an array of strings:
+
+```jldoctest
+julia> map(first ∘ reverse ∘ uppercase, split("you can compose functions like this"))
+6-element Array{Char,1}:
+ 'U'
+ 'N'
+ 'E'
+ 'S'
+ 'E'
+ 'S'
+```
+
+Function chaining (sometimes called "piping" or "using a pipe" to send data to a subsequent function) is when you apply a function to the previous function's output:
+
+```jldoctest
+julia> 1:10 |> sum |> sqrt
+7.416198487095663
+```
+
+Here, the total produced by `sum` is passed to the `sqrt` function. The equivalent composition would be:
+
+```jldoctest
+julia> (sqrt ∘ sum)(1:10)
+7.416198487095663
+```
+
+The pipe operator can also be used with broadcasting, as `.|>`, to provide a useful combination of the chaining/piping and dot vectorization syntax (described next).
+
+```jldoctest
+julia> ["a", "list", "of", "strings"] .|> [uppercase, reverse, titlecase, length]
+4-element Array{Any,1}:
+  "A"
+  "tsil"
+  "Of"
+ 7
+```
 
 ## [向量化函数的点语法](@id man-vectorized)
 
@@ -592,7 +703,15 @@ julia> f.(A, B)
 
 此外，*嵌套的* `f.(args...)` 调用会被*融合*到一个 `broadcast` 循环中。例如，`sin.(cos.(X))` 等价于 `broadcast(x -> sin(cos(x)), X)`，类似于 `[sin(cos(x)) for x in X]`：在 `X` 上只有一个循环，并且只为结果分配了一个数组。[ 相反，在典型的「向量化」语言中，`sin(cos(X))` 首先会为 `tmp=cos(X)` 分配第一个临时数组，然后在单独的循环中计算 `sin(tmp)`，再分配第二个数组。] 这种循环融合不是可能发生也可能不发生的编译器优化，只要遇到了嵌套的 `f.(args...)` 调用，它就是一个*语法保证*。技术上，一旦遇到「非点」函数调用，融合就会停止；例如，在 `sin.(sort(cos.(X)))` 中，由于插入的 `sort` 函数，`sin` 和 `cos` 无法被合并。
 
-最后，最大效率通常在向量化操作的输出数组被*预分配*时实现，以便重复调用不会一次又一次地为结果分配新数组（请参阅 [Pre-allocating outputs](@ref)）。一个方便的语法是 `X .= ...`，它等价于 `broadcast!(identity, X, ...)`，除了上面提到的，`broadcast!` 循环可与任何嵌套的「点」调用融合。例如，`X .= sin.(Y)` 等价于 `broadcast!(sin, X, Y)`，用 `sin.(Y)` in-place 覆盖 `X`。如果左边是数组索引表达式，例如 `X[2:end] .= sin.(Y)`，那就将 `broadcast!` 转换在一个 `view` 上，例如 `broadcast!(sin, view(X, 2:lastindex(X)), Y)`，这样左侧就被 in-place 更新了。
+Finally, the maximum efficiency is typically achieved when the output array of a vectorized operation
+is *pre-allocated*, so that repeated calls do not allocate new arrays over and over again for
+the results (see [Pre-allocating outputs](@ref)). A convenient syntax for this is `X .= ...`, which
+is equivalent to `broadcast!(identity, X, ...)` except that, as above, the `broadcast!` loop is
+fused with any nested "dot" calls. For example, `X .= sin.(Y)` is equivalent to `broadcast!(sin, X, Y)`,
+overwriting `X` with `sin.(Y)` in-place. If the left-hand side is an array-indexing expression,
+e.g. `X[begin+1:end] .= sin.(Y)`, then it translates to `broadcast!` on a `view`, e.g.
+`broadcast!(sin, view(X, firstindex(X)+1:lastindex(X)), Y)`,
+so that the left-hand side is updated in-place.
 
 由于在表达式中为许多操作和函数调用添加点可能很乏味并导致难以阅读的代码，宏 [`@.`](@ref @__dot__) 用于将表达式中的*每个*函数调用、操作和赋值转换为「点」版本。
 

@@ -18,14 +18,30 @@ julia> foo.baz
 2
 ```
 
-对很多类型来说，通过给所有成员赋值来创建新对象的这种方式就足以用于产生新实例了。然而，在某些情形下，创建复合对象需要更多的功能。有时必须通过检查或转化参数来确保固有属性不变。[递归数据结构](https://en.wikipedia.org/wiki/Recursion_(computer_science)#Recursive_data_structures_(structural_recursion))，特别是那些可能引用自身的数据结构，它们通常不能被干净地构造，而是需要首先被不完整地构造，然后再通过编程的方式完成补全。为了方便，有时需要用较少的参数或者不同类型的参数来创建对象，Julia 的对象构造系统解决了所有这些问题。
+For many types, forming new objects by binding their field values together is all that is ever
+needed to create instances. However, in some cases more functionality is required when
+creating composite objects. Sometimes invariants must be enforced, either by checking arguments
+or by transforming them. [Recursive data structures](https://en.wikipedia.org/wiki/Recursion_%28computer_science%29#Recursive_data_structures_.28structural_recursion.29),
+especially those that may be self-referential, often cannot be constructed cleanly without first
+being created in an incomplete state and then altered programmatically to be made whole, as a
+separate step from object creation. Sometimes, it's just convenient to be able to construct objects
+with fewer or different types of parameters than they have fields. Julia's system for object construction
+addresses all of these cases and more.
 
 [^1]:
-命名法：虽然术语“构造函数”通常是指用于构造类型对象的函数全体，但通常会略微滥用术语将特定的构造方法称为“构造函数”。在这种情况下，通常可以从上下文中清楚地辨别出术语表示的是“构造方法”而不是“构造函数”，尤其是在讨论某个特别的“构造方法”的时候。
+    Nomenclature: while the term "constructor" generally refers to the entire function which constructs
+    objects of a type, it is common to abuse terminology slightly and refer to specific constructor
+    methods as "constructors". In such situations, it is generally clear from the context that the term
+    is used to mean "constructor method" rather than "constructor function", especially as it is often
+    used in the sense of singling out a particular method of the constructor from all of the others.
 
-## 外部构造方法
+## [Outer Constructor Methods](@id man-outer-constructor-methods)
 
-构造函数与 Julia 中的其他任何函数一样，其整体行为由其各个方法的组合行为定义。因此，只要定义新方法就可以向构造函数添加功能。例如，假设你想为 `Foo` 对象添加一个构造方法，该方法只接受一个参数并其作为 `bar` 和 `baz` 的值。这很简单：
+A constructor is just like any other function in Julia in that its overall behavior is defined
+by the combined behavior of its methods. Accordingly, you can add functionality to a constructor
+by simply defining new methods. For example, let's say you want to add a constructor method for
+`Foo` objects that takes only one argument and uses the given value for both the `bar` and `baz`
+fields. This is simple:
 
 ```jldoctest footype
 julia> Foo(x) = Foo(x,x)
@@ -45,16 +61,27 @@ julia> Foo()
 Foo(0, 0)
 ```
 
-这里零参数构造方法会调用单参数构造方法，单参数构造方法又调用了自动提供默认值的双参数构造方法。上面附加的这类构造方法，它们的声明方式与普通的方法一样，像这样的构造方法被称为**外部**构造方法，下文很快就会揭示这样称呼的原因。外部构造方法只能通过调用其他构造方法来创建新实例，比如自动提供默认值的构造方法。
+Here the zero-argument constructor method calls the single-argument constructor method, which
+in turn calls the automatically provided two-argument constructor method. For reasons that will
+become clear very shortly, additional constructor methods declared as normal methods like this
+are called *outer* constructor methods. Outer constructor methods can only ever create a new instance
+by calling another constructor method, such as the automatically provided default ones.
 
-## 内部构造方法
+## [Inner Constructor Methods](@id man-inner-constructor-methods)
 
-尽管外部构造方法可以成功地为构造对象提供了额外的便利，但它无法解决另外两个在本章导言里提到的问题：确保固有属性不变和允许创建自引用对象。因此，我们需要**内部**构造方法。内部构造方法和外部构造方法很相像，但有两点不同：
+While outer constructor methods succeed in addressing the problem of providing additional convenience
+methods for constructing objects, they fail to address the other two use cases mentioned in the
+introduction of this chapter: enforcing invariants, and allowing construction of self-referential
+objects. For these problems, one needs *inner* constructor methods. An inner constructor method
+is like an outer constructor method, except for two differences:
 
-1. 内部构造方法在 `struct`-block 的内部声明，而不是和普通方法一样在外部。
-2. 内部构造方法能够访问一个特殊的局部函数 [`new`](@ref)，此函数能够创建该类型的对象。
+1. It is declared inside the block of a type declaration, rather than outside of it like normal methods.
+2. It has access to a special locally existent function called [`new`](@ref) that creates objects of the
+   block's type.
 
-例如，假设你要声明一个保存一对实数的类型，但要约束第一个数不大于第二个数。你可以像这样声明它：
+For example, suppose one wants to declare a type that holds a pair of real numbers, subject to
+the constraint that the first number is not greater than the second one. One could declare it
+like this:
 
 ```jldoctest pairtype
 julia> struct OrderedPair
@@ -78,9 +105,9 @@ Stacktrace:
  [3] top-level scope
 ```
 
-如果类型被声明为 `mutable`，你可以直接更改成员变量的值来打破这个固有属性，然而，在未经允许的情况下，随意摆弄对象的内核一般都是不好的行为。你（或者其他人）可以在以后任何时候提供额外的外部构造方法，但一旦类型被声明了，就没有办法来添加更多的内部构造方法了。由于外部构造方法只能通过调用其它的构造方法来创建对象，所以最终构造对象的一定是某个内部构造函数。这保证了类型的对象必须是经过内部构造才得已存在，从而在某种程度上保证了类型的固有属性。
+如果类型被声明为 `mutable`，你可以直接更改字段值来打破这个固有属性，然而，在未经允许的情况下，随意摆弄对象的内核一般都是不好的行为。你（或者其他人）可以在以后任何时候提供额外的外部构造方法，但一旦类型被声明了，就没有办法来添加更多的内部构造方法了。由于外部构造方法只能通过调用其它的构造方法来创建对象，所以最终构造对象的一定是某个内部构造函数。这保证了已声明类型的对象必须通过调用该类型的内部构造方法才得已存在，从而在某种程度上保证了类型的固有属性。
 
-只要定义了任何一个内部构造方法，Julia 就不会再提供默认的构造方法：它会假定你已经为自己提供了所需的所有内部构造方法。默认构造方法等效于一个你自己编写的内部构造函数，该函数将所有成员作为参数（如果相应的成员具有类型，则约束为正确的类型），并将它们传递给 `new`，最后返回结果对象：
+只要定义了任何一个内部构造方法，Julia 就不会再提供默认的构造方法：它会假定你已经为自己提供了所需的所有内部构造方法。默认构造方法等效于一个你自己编写的内部构造函数，该函数将所有成员作为参数（如果相应的字段具有类型，则约束为正确的类型），并将它们传递给 `new`，最后返回结果对象：
 
 ```jldoctest
 julia> struct Foo
@@ -166,16 +193,17 @@ true
 
 ```jldoctest incomplete
 julia> mutable struct Incomplete
-           xx
+           data
            Incomplete() = new()
        end
 
 julia> z = Incomplete();
 ```
+
 尽管允许创建含有未初始化成员的对象，然而任何对未初始化引用的访问都会立即报错：
 
 ```jldoctest incomplete
-julia> z.xx
+julia> z.data
 ERROR: UndefRefError: access to undefined reference
 ```
 
@@ -197,12 +225,12 @@ HasPlain(438103441441)
 
 ```jldoctest
 julia> mutable struct Lazy
-           xx
+           data
            Lazy(v) = complete_me(new(), v)
        end
 ```
 
-与构造函数返回的不完整对象一样，如果 `complete_me` 或其任何被调用者尝试在初始化之前访问 `Lazy` 对象的 `xx` 成员，就会立刻报错。
+与构造函数返回的不完整对象一样，如果 `complete_me` 或其任何被调用者尝试在初始化之前访问 `Lazy` 对象的 `data` 字段，就会立刻报错。
 
 ## 参数类型的构造函数
 
@@ -220,16 +248,16 @@ Point{Int64}(1, 2)
 julia> Point(1.0,2.5) ## 隐式的 T ##
 Point{Float64}(1.0, 2.5)
 
-julia> Point(1,2.5) ## 隐式的 T ##
+julia> Point(1,2.5) ## implicit T ##
 ERROR: MethodError: no method matching Point(::Int64, ::Float64)
 Closest candidates are:
-  Point(::T<:Real, ::T<:Real) where T<:Real at none:2
+  Point(::T, ::T) where T<:Real at none:2
 
 julia> Point{Int64}(1, 2) ## 显式的 T ##
 Point{Int64}(1, 2)
 
 julia> Point{Int64}(1.0,2.5) ## 显式的 T ##
-ERROR: InexactError: Int64(Int64, 2.5)
+ERROR: InexactError: Int64(2.5)
 Stacktrace:
 [...]
 
@@ -256,7 +284,7 @@ julia> Point(x::T, y::T) where {T<:Real} = Point{T}(x,y);
 
 注意，每个构造函数定义的方式与调用它们的方式是一样的。调用 `Point{Int64}(1,2)` 会触发 `struct` 块内部的 `Point{T}(x,y)`。另一方面，外部构造函数声明的 `Point` 构造函数只会被同类型的实数对触发，它使得我们可以直接以 `Point(1,2)` 和 `Point(1.0,2.5)` 这种方式来创建实例，而不需要显示地使用类型参数。由于此方法的声明方式已经对输入参数的类型施加了约束，像 `Point(1,2.5)` 这种调用自然会导致 "no method" 错误。
 
-假如我们想让l `Point(1,2.5)` 这种调用方式正常工作，比如，通过将整数 1 自动“提升”为浮点数 `1.0`，最简单的方法是像下面这样定义一个额外的外部构造函数：
+假如我们想让 `Point(1,2.5)` 这种调用方式正常工作，比如，通过将整数 `1` 自动「提升」为浮点数 `1.0`，最简单的方法是像下面这样定义一个额外的外部构造函数：
 
 ```jldoctest parametric2
 julia> Point(x::Int64, y::Float64) = Point(convert(Float64,x),y);
@@ -278,7 +306,7 @@ Point{Float64}
 julia> Point(1.5,2)
 ERROR: MethodError: no method matching Point(::Float64, ::Int64)
 Closest candidates are:
-  Point(::T<:Real, !Matched::T<:Real) where T<:Real at none:1
+  Point(::T, !Matched::T) where T<:Real at none:1
 ```
 
 如果你想要找到一种方法可以使类似的调用都可以正常工作，请参阅[类型转换与类型提升](@ref conversion-and-promotion)。这里稍稍“剧透”一下，我们可以利用下面的这个外部构造函数来满足需求，无论输入参数的类型如何，它都可以触发通用的 `Point` 构造函数：
@@ -360,7 +388,7 @@ julia> function ⊘(x::Complex, y::Complex)
 
 为了方便，`OurRational` 也提供了一些其它的外部构造函数。第一个外部构造函数是“标准的”通用构造函数，当分子和分母的类型一致时，它就可以推导出类型参数 `T`。第二个外部构造函数可以用于分子和分母的类型不一致的情景，它会将分子和分母的类型提升至一个共同的类型，然后再委托第一个外部构造函数进行构造。第三个构造函数会将一个整数转化为分数，方法是将 1 当作分母。
 
-在定义了外部构造函数之后，我们为 `⊘` 算符定义了一系列的方法，之后就可以使用 `⊘` 算符来写分数，比如 `1 ⊘ 2`。Julia 的 `Rational` 类型采用的是 [`//`](@ref) 算符。在做上述定义之前，`⊘` 是一个无意的且未被定义的算符。它的行为与在[分数](@ref)一节中描述的一致，注意它的所有行为都是那短短几行定义的。第一个也是最基础的定义只是将 `a ⊘ b` 中的 `a` 和 `b` 当作参数传递给 `OurRational` 的构造函数来实例化 `OurRational`，当然这要求 `a` 和 `b` 分别都是整数。在 `⊘` 的某个操作数已经是分数的情况下，我们采用了一个有点不一样的方法来构建新的分数，这实际上等价于用分数除以一个整数。最后，我们也可以让 `⊘` 作用于复数，用来创建一个类型为 `Complex{OurRational}` 的对象，即一个实部和虚部都是分数的复数：
+在定义了外部构造函数之后，我们为 `⊘` 算符定义了一系列的方法，之后就可以使用 `⊘` 算符来写分数，比如 `1 ⊘ 2`。Julia 的 `Rational` 类型采用的是 [`//`](@ref) 算符。在做上述定义之前，`⊘` 是一个无意的且未被定义的算符。它的行为与在[有理数](@ref)一节中描述的一致，注意它的所有行为都是那短短几行定义的。第一个也是最基础的定义只是将 `a ⊘ b` 中的 `a` 和 `b` 当作参数传递给 `OurRational` 的构造函数来实例化 `OurRational`，当然这要求 `a` 和 `b` 分别都是整数。在 `⊘` 的某个操作数已经是分数的情况下，我们采用了一个有点不一样的方法来构建新的分数，这实际上等价于用分数除以一个整数。最后，我们也可以让 `⊘` 作用于复数，用来创建一个类型为 `Complex{OurRational}` 的对象，即一个实部和虚部都是分数的复数：
 
 ```jldoctest rational
 julia> z = (1 + 2im) ⊘ (1 - 2im);
@@ -372,12 +400,11 @@ julia> typeof(z) <: Complex{OurRational}
 false
 ```
 
-因此，尽管 `⊘` 算符通常会返回一个 `OurRational` 的实例，但倘若其中一个操作数是复整数，那么就会返回 `Complex{OurRational}`。感兴趣的话可以
-读一读 [`rational.jl`](https://github.com/JuliaLang/julia/blob/master/base/rational.jl)：它实现了一个完整的 Julia 基本类型，但却非常的简短，而且是自包涵的。
+因此，尽管 `⊘` 算符通常会返回一个 `OurRational` 的实例，但倘若其中一个操作数是复整数，那么就会返回 `Complex{OurRational}`。感兴趣的话可以读一读 [`rational.jl`](https://github.com/JuliaLang/julia/blob/master/base/rational.jl)：它实现了一个完整的 Julia 基本类型，但却非常的简短，而且是自包涵的。
 
 ## Outer-only constructors
 
-正如我们所看到的，典型的参数类型都有一个内部构造函数，它仅在全部的类型参数都已知的情况下才会被调用。例如，可以用 `Point{Int}` 调用，但`Point` 就不行。我们可以选择性的添加外部构造函数来自动推导并添加类型参数，比如，调用 `Point(1,2)` 来构造 `Point{Int}`。外部构造函数调用内部构造函数来执行创建实例的核心工作。然而，在某些情况下，我们可能并不想要内部构造函数，从而达到禁止手动指定类型参数的目的。
+正如我们所看到的，典型的参数类型都有一个内部构造函数，它仅在全部的类型参数都已知的情况下才会被调用。例如，可以用 `Point{Int}` 调用，但`Point` 就不行。我们可以选择性的添加外部构造函数来自动推导并添加类型参数，比如，调用 `Point(1,2)` 来构造 `Point{Int}`。外部构造函数调用内部构造函数来实际创建实例。然而，在某些情况下，我们可能并不想要内部构造函数，从而达到禁止手动指定类型参数的目的。
 
 例如，假设我们要定义一个类型用于存储数组以及其累加和：
 

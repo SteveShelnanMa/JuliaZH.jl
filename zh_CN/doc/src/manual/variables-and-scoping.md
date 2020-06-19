@@ -1,34 +1,24 @@
 # [变量作用域](@id scope-of-variables)
 
-变量的*作用域*是代码的一个区域，在这个区域中这个变量是可见的。给变量划分作用域有助于解决变量命名冲突。这个概念是符合直觉的：两个函数可能同时都有叫做`x`的参量，而这两个`x`并不指向同一个东西。相似地，也有很多其他的情况下代码的不同块会使用同样名字而并不指向同一个东西。相同的变量名是否指向同一个东西的规则被称为作用域规则；这一届会详细地把这个规则讲清楚。
+变量的*作用域*是代码的一个区域，在这个区域中这个变量是可见的。给变量划分作用域有助于解决变量命名冲突。这个概念是符合直觉的：两个函数可能同时都有叫做 `x` 的参量，而这两个 `x` 并不指向同一个东西。相似地，也有很多其他的情况下代码的不同块会使用同样名字而并不指向同一个东西。相同的变量名是否指向同一个东西的规则被称为作用域规则；这一届会详细地把这个规则讲清楚。
 
-语言中的某个创建会引入*作用域块*，这是代码中的一个区域，有资格成为一些变量集合的作用域。一个变量的作用域不可能是源代码行的任意集合；相反，它始终与这些块之一关系密切。在Julia中有两个主要类型的作用域，*全局作用域*与*局部作用域*，后者可以嵌套。引入作用域块的创建是：
+语言中的某些结构会引入*作用域块*，这是有资格成为一些变量集合的作用域的代码区域。一个变量的作用域不可能是源代码行的任意集合；相反，它始终与这些块之一关系密切。在 Julia 中主要有两种作用域，*全局作用域*与*局部作用域*，后者可以嵌套。引入作用域块的结构有：
 
-# [](@id man-scope-table)
+### [作用域结构](@id man-scope-table)
 
-  * 只能在其他全局作用域块中嵌套的作用域块：
+结构 | 作用域类型 | 可嵌入的作用域块
+------------ | -------------  |---------------------------
+[`module`](@ref), [`baremodule`](@ref)            | 全局 | 全局
+交互式提示符（REPL）                         | 全局 | 全局
+(mutable) [`struct`](@ref), [`macro`](@ref)       | 局部  | 全局
+[`for`](@ref), [`while`](@ref), [`try-catch-finally`](@ref try), [`let`](@ref) |局部 | 全局或局部
+函数（语法，匿名或者do语法块） | 局部 | 全局或局部
+推导式，broadcast-fusing                 | 局部 | 全局或局部
 
-    - 全局作用域
-
-      + 模块，裸模块
-
-      + 在交互式提示行（REPL）
-
-    - 局部作用域（不允许嵌套）
-
-      + （可变的）结构，宏
-
-  * 可以在任何地方嵌套的作用域块（在全局或者局部作用域中）：
-
-    - 局部作用域
-
-      + for，while，try-catch-finally，let
-
-      + 函数（语法，匿名或者do语法块）
-
-      + 推导式，broadcast-fusing
-
-值得注意的是，这个表内没有的是[ begin 块](@ref man-compound-experessions)和[ if 块](@ref man-conditional-evaluation)，这两个块*不会*引进新的作用域块。这两种作用域遵循的规则有点不一样，会在下面解释。
+Notably missing from this table are
+[begin blocks](@ref man-compound-expressions) and [if blocks](@ref man-conditional-evaluation)
+which do *not* introduce new scopes.
+Both types of scopes follow somewhat different rules which will be explained below.
 
 Julia使用[词法作用域](https://en.wikipedia.org/wiki/Scope_%28computer_science%29#Lexical_scoping_vs._dynamic_scoping)，也就是说一个函数的作用域不会从其调用者的作用域继承，而从函数定义处的作用域继承。举个例子，在下列的代码中`foo`中的`x`指向的是模块`Bar`的全局作用域中的`x`。
 
@@ -87,11 +77,17 @@ ERROR: cannot assign variables in other modules
 
 ## 局部作用域
 
-大多数代码块都会引进一个新的局部作用域（参见上面的[表](@ref man-scope-table)以获取完整列表）。局部作用域会从父作用域中继承所有的变量，读和写都一样。另外，局部作用域还会继承赋值给其父全局作用域块的所有全局变量（如果由全局`if`或者`begin`作用域包围）。不像全局作用域，局部作用域并不是命名空间，所以在其内部作用域中的变量无法通过一些合格的通路在其父作用域中得到。
+A new local scope is introduced by most code blocks (see above
+[table](@ref man-scope-table) for a complete list).
+A local scope inherits all the variables from a parent local scope,
+both for reading and writing.
+Unlike global scopes, local scopes are not namespaces,
+thus variables in an inner scope cannot be retrieved from the parent scope through some sort of
+qualified access.
 
-接下来的规则和例子都适用于局部作用域。
-在局部作用域中新引进的变量不会反向传播到其父作用域。
-例如，这里``z``并没有引入到顶层作用域：
+The following rules and examples pertain to local scopes.
+A newly introduced variable in a local scope cannot be referenced by a parent scope.
+For example, here the ``z`` is not introduced into the top-level scope:
 
 ```jldoctest
 julia> for i = 1:10
@@ -102,23 +98,36 @@ julia> z
 ERROR: UndefVarError: z not defined
 ```
 
-（注意，在这个和以下所有的例子中都假设了它们的顶层作用域是一个工作空间是空的全局作用域，比如一个新打开的REPL。）
+!!! note
+    在这个和以下所有的例子中都假设了它们的顶层作用域是一个工作空间是空的全局作用域，比如一个新打开的REPL。
 
-在局部作用域中可以使用`local`关键字来使一个变量强制为新的局部变量。
+Inner local scopes can, however, update variables in their parent scopes:
 
 ```jldoctest
-julia> x = 0;
-
-julia> for i = 1:10
-           local x # this is also the default
-           x = i + 1
+julia> for i = 1:1
+           z = i
+           for j = 1:1
+               z = 0
+           end
+           println(z)
        end
-
-julia> x
 0
 ```
 
-在局部作用域内部，可以使用`global`关键字赋值给一个全局变量：
+在局部作用域中可以使用 [`local`](@ref) 关键字来使一个变量强制为新的局部变量。
+
+```jldoctest
+julia> for i = 1:1
+           x = i + 1
+           for j = 1:1
+               local x = 0
+           end
+           println(x)
+       end
+2
+```
+
+在局部作用域内部，可以使用 [`global`](@ref) 关键字来给全局变量赋值：
 
 ```jldoctest
 julia> for i = 1:10
@@ -144,14 +153,12 @@ julia> z
 
 `local`和`global`关键字都可以用于解构赋值，也就是说`local x, y = 1, 2`。在这个例子中关键字影响所有的列出来的变量。
 
-大多数块关键字都会引入局部作用域，而`begin`和`if`是例外。
-
 在一个局部作用域中，所有的变量都会从其父作用域块中继承，除非：
 
   * 赋值会导致*全局*变量改变，或者
   * 变量专门使用`local`关键字标记。
 
-所以全局变量只能通过读来继承，而不能通过写来继承。
+所以全局变量只能通过读来继承，不能通过写来继承。
 
 ```jldoctest
 julia> x, y = 1, 2;
@@ -170,8 +177,13 @@ julia> x
 
 为一个全局变量赋值需要显式的`global`：
 
-!!! sidebar "不要用全局变量"
-    为了使得编出来的程序是最好的，很多人都考虑了避免改变全局变量的值。一个原因是远程改变其他模块中的全局变量的状态会导致程序的局部行为变得难以琢磨，应该小心行事。这也是为什么引入局部作用域的作用域块需要``global``关键字来声明其改变一个全局变量的意图。
+!!! sidebar "Avoiding globals"
+    Avoiding changing the value of global variables is considered by many
+    to be a programming best-practice.
+    Changing the value of a global variable can cause "action at a distance",
+    making the behavior of a program harder to reason about.
+    This is why the scope blocks that introduce local scope require the `global`
+    keyword to declare the intent to modify a global variable.
 
 ```jldoctest
 julia> x = 1;
@@ -207,8 +219,10 @@ julia> x, y # verify that global x and y are unchanged
 (1, 2)
 ```
 
-允许嵌套函数*修改*其父作用域的*局部*变量的原因是允许构建[`闭包`](https://en.wikipedia.org/wiki/Closure_%28computer_programming%29)，
-闭包中有一个私有的态，例如下面例子中的``state``变量：
+The reason to allow modifying local variables of parent scopes in
+nested functions is to allow constructing [`closures`](https://en.wikipedia.org/wiki/Closure_%28computer_programming%29)
+which have private state, for instance the `state` variable in the
+following example:
 
 ```jldoctest
 julia> let state = 0
@@ -222,9 +236,13 @@ julia> counter()
 2
 ```
 
-也可以参见接下来两节例子中的闭包。例如在第一个例子中的`x`与在第二个例子中的`state`，内部函数从包含它的作用域中继承的变量有时被称为*捕获*变量。捕获变量会带来性能挑战，这会在[性能建议](@ref man-performance-tips)中讨论。
+See also the closures in the examples in the next two sections. A variable,
+such as `x` in the first example and `state` in the second, that is inherited
+from the enclosing scope by the inner function is sometimes called a
+*captured* variable. Captured variables can present [performance challenges
+discussed in performance tips](@ref man-performance-captured).
 
-继承全局作用域与嵌套局部作用域的区别会导致在局部或者全局作用域中定义的函数在变量赋值上的稍许区别。考虑一下上面最后一个例子的一个变化，把`bar`移动到全局作用域中：
+继承全局作用域与嵌套局部作用域的区别可能导致在局部或者全局作用域中定义的函数在变量赋值上有稍许区别。考虑一下上面最后一个例子的一个变化，把 `bar` 移动到全局作用域中：
 
 ```jldoctest
 julia> x, y = 1, 2;
@@ -349,7 +367,9 @@ julia> let
 
 ### 对于循环和推导式
 
-`for`循环，`while`循环，和[Comprehensions](@ref)拥有下述的行为：任何在它们的内部的作用域中引入的新变量在每次循环迭代中都会被新分配一块内存，就像循环体是被`let`块包围一样。
+`for` loops, `while` loops, and [comprehensions](@ref man-comprehensions) have the following behavior: any new variables
+introduced in their body scopes are freshly allocated for each loop iteration, as if the loop body
+were surrounded by a `let` block:
 
 ```jldoctest
 julia> Fs = Vector{Any}(undef, 2);
@@ -379,16 +399,15 @@ julia> f()
 0
 ```
 
-但是，有时重复使用一个存在的变量作为迭代变量是有用的。
-这能够通过添加关键字`outer`来方便地做到：
+但是，有时重复使用一个存在的局部变量作为迭代变量是有用的。这能够通过添加关键字 `outer` 来方便地做到：
 
 ```jldoctest
 julia> function f()
- i = 0
- for outer i = 1:3
- end
- return i
- end;
+           i = 0
+           for outer i = 1:3
+           end
+           return i
+       end;
 
 julia> f()
 3
@@ -396,7 +415,7 @@ julia> f()
 
 ## 常量
 
-变量的经常的一个使用方式是给一个特定的不变的值一个名字。这样的变量只会被赋值一次。这个想法可以通过使用`const`关键字传递给编译器：
+变量的经常的一个使用方式是给一个特定的不变的值一个名字。这样的变量只会被赋值一次。这个想法可以通过使用 [`const`](@ref) 关键字传递给编译器：
 
 ```jldoctest
 julia> const e  = 2.71828182845904523536;
@@ -416,7 +435,7 @@ julia> const a, b = 1, 2
 
 特别的顶层赋值，比如使用`function`和`structure`关键字进行的，默认是不变的。
 
-注意`const`只会影响变量绑定；变量可能会绑定到一个可变的对象上（比如一个数组）使得其任然能被改变。另外当尝试给一个声明为常量的变量赋值时下列情景是可能的：
+注意 `const` 只会影响变量绑定；变量可能会绑定到一个可变的对象上（比如一个数组）使得其仍然能被改变。另外当尝试给一个声明为常量的变量赋值时下列情景是可能的：
 
 * 如果一个新值的类型与常量类型不一样时会扔出一个错误：
 ```jldoctest
@@ -476,7 +495,7 @@ WARNING: redefining constant a
  1
 ```
 
-注意，即使可能，改变一个声明为常量的变量的值是十分不推荐的。举个例子，如果一个方法引用了一个常量并且在常量被改变之前已经被编译了，那么这个变量还是会保留使用原来的值：
+注意，改变一个声明为常量的变量的值虽然有时是可能的，但是十分不推荐这样做，并且在交互式使用中这样做仅仅是为了更加方便。举个例子，如果一个方法引用了一个常量并且在常量被改变之前已经被编译了，那么这个变量还是会保留使用原来的值：
 ```jldoctest
 julia> const x = 1
 1

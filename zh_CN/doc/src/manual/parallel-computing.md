@@ -7,27 +7,29 @@
 2. 多线程
 3. 多核心或分布式处理
 
-我们首先考虑 Julia 任务 [Tasks](@ref man-tasks) （也就是协程）以及其它依赖于 Julia  运行时库的模块。通过运行时库无需手动与操作系统的调度进行交互就可以挂起和恢复计算，并且对任务间的通信拥有完全控制。
-Julia 同样允许利用一些操作在任务间进行通信，比如 ['wait'](@ref) 以及 ['fetch'](@ref)。
-另外，通信和数据同步是通过管道 ['Channel'](@ref) 完成的，它也是实现任务间通信的基石。
+我们首先考虑 Julia 任务 [Task（也就是协程）](@ref man-tasks)以及其它依赖于 Julia  运行时库的模块，通过运行时库，我们无需手动与操作系统的调度进行交互就可以挂起和恢复计算，并且对 `Task` 间内部通信拥有完全控制。Julia 同样支持利用一些操作在 `Task` 间进行通信，比如 [`wait`](@ref) 以及 [`fetch`](@ref)。另外，通信和数据同步是通过管道 [`Channel`](@ref) 完成的，它也为 `Task` 间内部通信提供了渠道。
 
-Julia 还支持实验性的多线程功能，在执行时通过分叉(fork)，然后有一个匿名函数在所有线程上运行。由于是一种*分叉-汇合*(fork-join)的方式，并行执行的线程必须在分叉之后，汇合到 Julia 主线程上，从而继续串行执行。多线程功能是通过 `Base.Threads` 模块提供的，目前仍然是实验性的，因为目前Julia 还不是完全线程安全的。尤其是在进行 I/O 操作和协程切换的时候可能会有段错误出现。最新的进展请关注 [the issue tracker](https://github.com/JuliaLang/julia/issues?q=is%3Aopen+is%3Aissue+label%3Amultithreading)。多线程应该只在你考虑全局变量、锁以及原子操作的时候使用，后面我们会详细讲解。
+Julia also supports [experimental multi-threading](@ref man-multithreading), where execution is forked and an anonymous function is run across all
+threads.
+Known as the fork-join approach, parallel threads execute independently, and must ultimately be joined in Julia's main thread to allow serial execution to continue.
+Multi-threading is supported using the [`Base.Threads`](@ref lib-multithreading) module that is still considered experimental, as Julia is
+not yet fully thread-safe. In particular segfaults seem to occur during I/O operations and task switching.
+As an up-to-date reference, keep an eye on [the issue tracker](https://github.com/JuliaLang/julia/issues?q=is%3Aopen+is%3Aissue+label%3Amultithreading).
+Multi-Threading should only be used if you take into consideration global variables, locks and
+atomics, all of which are explained later.
 
-最后我们将介绍 Julia 的分布式和并行计算的实现方法。鉴于以科学计算为主要目的，
-Julia 底层实现上提供了通过多核或多机器对任务并行的接口。
-同时我们还将介绍一些有用的分布式编程的外部包，比如 'MPI.jl' 以及 'DistributedArrays.jl'。
+最后我们将介绍 Julia 的分布式和并行计算的实现方法。鉴于以科学计算为主要目的，Julia 底层实现上提供了跨多核或多机器对任务并行的接口。同时我们还将介绍一些有用的分布式编程的外部包，比如 `MPI.jl` 以及 `DistributedArrays.jl`。
 
 # 协程
 
-Julia 的并行编程平台采用协程任务 [Tasks (aka Coroutines)](@ref man-tasks) 来进行多个计算之间的切换。为了表示轻量线程之间的执行顺序，必须提供一种通信的原语。Julia 提供了函数 `Channel(func::Function, ctype=Any, csize=0, taskref=nothing)`，根据 `func` 创建 task，然后将其绑定到一个新的大小为 `csize`、 类型为 `ctype` 的管道上，并调度 task。`管道` 可以当作是一种task之间通信的方式，`Channel{T}(sz::Int)` 会创建一个类型为 `T`、 大小为 `sz` 的管道。无论何时发起一个通信操作，如 [`fetch`](@ref) 或 [`wait`](@ref)，当前 task 都会挂起，然后调度器会选择其它 task 去执行，在一个 task 等待的事件结束之后会重新恢复执行。
+Julia 的并行编程平台采用协程任务 [Tasks (aka Coroutines)](@ref man-tasks) 来进行多个计算之间的切换。为了表示轻量线程之间的执行顺序，必须提供一种通信的原语。Julia 提供了函数 `Channel(func::Function, ctype=Any, csize=0, taskref=nothing)`，根据 `func` 创建 task，然后将其绑定到一个新的大小为 `csize`、 类型为 `ctype` 的管道上，并调度 task。`Channel` 可以当作是一种 task 之间通信的方式，`Channel{T}(sz::Int)` 会创建一个类型为 `T`、 大小为 `sz` 的管道。无论何时发起一个通信操作，如 [`fetch`](@ref) 或 [`wait`](@ref)，当前 task 都会挂起，然后调度器会选择其它 task 去执行，在一个 task 等待的事件结束之后会重新恢复执行。
 
 对于许多问题而言，并不需要直接考虑 task。不过，task 可以用来同时等待多个事件，从而实现**动态调度**。在动态调度的过程中，程序可以决定计算什么，或者根据其它任务执行结束的时间决定接下来在哪里执行计算。这对于不可预测或不平衡的计算量来说是必须的，因为我们只希望给那些已经完成了其当前任务的进程分配更多的任务。
 
 
 ## 管道
 
-在 [Control Flow](@ref) 中有关 [`Task`](@ref) 的部分，已经讨论了如何协调多个函数的执行。[`Channel`](@ref) 可以很方便地在多个运行中的 task 传递数据，特别是那些涉及 I/O 的操作。
-
+在 [流程控制](@ref) 中有关 [`Task`](@ref) 的部分，已经讨论了如何协调多个函数的执行。[`Channel`](@ref) 可以很方便地在多个运行中的 task 传递数据，特别是那些涉及 I/O 的操作。
 
 典型的 I/O 操作包括读写文件、访问 web 服务、执行外部程序等。在所有这些场景中，如果其它 task 可以在读取文件（等待外部服务或程序执行完成）时继续执行，那么总的执行时间能够得到大大提升。
 
@@ -43,7 +45,7 @@ Julia 的并行编程平台采用协程任务 [Tasks (aka Coroutines)](@ref man-
     c1 = Channel(32)
     c2 = Channel(32)
 
-    # and a function `foo` which reads items from from c1, processes the item read
+    # and a function `foo` which reads items from c1, processes the item read
     # and writes a result to c2,
     function foo()
         while true
@@ -55,54 +57,54 @@ Julia 的并行编程平台采用协程任务 [Tasks (aka Coroutines)](@ref man-
 
     # we can schedule `n` instances of `foo` to be active concurrently.
     for _ in 1:n
-        @schedule foo()
+        @async foo()
     end
     ```
-* Channe l可以通过 `Channel{T}(sz)` 构造，得到的 channel 只能存储类型 `T` 的数据。如果 `T` 没有指定，那么 channel 可以存任意类型。`sz` 表示该 channel 能够存储的最大元素个数。比如 `Channel(32)` 得到的 channel 最多可以存储32个元素。而 `Channel{MyType}(64)` 则可以最多存储64个 `MyType` 类型的数据。
-   
-   
-   
-   
-* 如果一个 [`Channel`](@ref) 是空的，读取的 task(即执行 [`take!`](@ref) 的 task)会被阻塞直到有新的数据准备好了。
-* 如果一个 [`Channel`](@ref) 是满的，那么写入的 task(即执行 [`put!`](@ref) 的 task)则会被阻塞，直到 Channel 有空余。
-* [`isready`](@ref) 可以用来检查一个 channel 中是否有已经准备好的元素，而等待一个元素准备好 则用 [`wait`](@ref)
-   
-* 一个 [`Channel`](@ref) 一开始处于开启状态，也就是说可以被 [`take!`](@ref) 读取和 [`put!`](@ref) 写入。[`close`](@ref) 会关闭一个 [`Channel`](@ref)，对于一个已经关闭的 [`Channel`](@ref)，[`put!`](@ref) 会失败，例如：
-   
-   
+  * Channel 可以通过 `Channel{T}(sz)` 构造，得到的 channel 只能存储类型 `T` 的数据。如果 `T` 没有指定，那么 channel 可以存任意类型。`sz` 表示该 channel 能够存储的最大元素个数。比如 `Channel(32)` 得到的 channel 最多可以存储32个元素。而 `Channel{MyType}(64)` 则可以最多存储64个 `MyType` 类型的数据。
+     
+     
+     
+     
+  * 如果一个 [`Channel`](@ref) 是空的，读取的 task(即执行 [`take!`](@ref) 的 task)会被阻塞直到有新的数据准备好了。
+  * 如果一个 [`Channel`](@ref) 是满的，那么写入的 task(即执行 [`put!`](@ref) 的 task)则会被阻塞，直到 Channel 有空余。
+  * [`isready`](@ref) 可以用来检查一个 channel 中是否有已经准备好的元素，而等待一个元素准备好 则用 [`wait`](@ref)
+     
+  * 一个 [`Channel`](@ref) 一开始处于开启状态，也就是说可以被 [`take!`](@ref) 读取和 [`put!`](@ref) 写入。[`close`](@ref) 会关闭一个 [`Channel`](@ref)，对于一个已经关闭的 [`Channel`](@ref)，[`put!`](@ref) 会失败，例如：
+     
+     
 
-```julia-repl
-julia> c = Channel(2);
+    ```julia-repl
+    julia> c = Channel(2);
 
-julia> put!(c, 1) # `put!` on an open channel succeeds
-1
+    julia> put!(c, 1) # `put!` on an open channel succeeds
+    1
 
-julia> close(c);
+    julia> close(c);
 
-julia> put!(c, 2) # `put!` on a closed channel throws an exception.
-ERROR: InvalidStateException("Channel is closed.",:closed)
-Stacktrace:
-[...]
-```
+    julia> put!(c, 2) # `put!` on a closed channel throws an exception.
+    ERROR: InvalidStateException("Channel is closed.",:closed)
+    Stacktrace:
+    [...]
+    ```
 
   * [`take!`](@ref) 和 [`fetch`](@ref) (只读取，不会将元素从 channel 中删掉)仍然可以从一个已经关闭的 channel 中读数据，直到 channel 被取空了为止。继续上面的例子：
      
 
-```julia-repl
-julia> fetch(c) # Any number of `fetch` calls succeed.
-1
+    ```julia-repl
+    julia> fetch(c) # Any number of `fetch` calls succeed.
+    1
 
-julia> fetch(c)
-1
+    julia> fetch(c)
+    1
 
-julia> take!(c) # The first `take!` removes the value.
-1
+    julia> take!(c) # The first `take!` removes the value.
+    1
 
-julia> take!(c) # No more data available on a closed channel.
-ERROR: InvalidStateException("Channel is closed.",:closed)
-Stacktrace:
-[...]
-```
+    julia> take!(c) # No more data available on a closed channel.
+    ERROR: InvalidStateException("Channel is closed.",:closed)
+    Stacktrace:
+    [...]
+    ```
 
 `Channel` 可以在 `for` 循环中遍历，此时，循环会一直运行直到 `Channel` 中有数据，遍历过程中会取遍加入到 `Channel` 中的所有值。一旦 `Channel`关闭或者取空了，`for` 循环就会终止。
 
@@ -132,7 +134,7 @@ julia> data = [i for i in c]
  3
 ```
 
-考虑这样一个用 channel 做 task 之间通信的例子。首先，起4个 task 来处理一个 `jobs` channel 中的数据。`jobs` 中的每个任务通过 `job_id` 来表示，然后每个 task 模拟读取一个 `job_id`，然后随机等待一会儿，然后往一个 `results` channel 中写入一个 Tuple，分别包含 `job_id` 和执行的时间，最后将结果打印出来：
+考虑这样一个用 channel 做 task 之间通信的例子。首先，起 4 个 task 来处理一个 `jobs` channel 中的数据。`jobs` 中的每个任务通过 `job_id` 来表示，然后每个 task 模拟读取一个 `job_id`，然后随机等待一会儿，然后往一个 results channel 中写入一个元组，它分别包含 `job_id` 和执行的时间，最后将结果打印出来：
 
 ```julia-repl
 julia> const jobs = Channel{Int}(32);
@@ -142,8 +144,7 @@ julia> const results = Channel{Tuple}(32);
 julia> function do_work()
            for job_id in jobs
                exec_time = rand()
-               sleep(exec_time)                # simulates elapsed time doing actual work
-                                               # typically performed externally.
+               sleep(exec_time)                # 模拟执行实际外部工作所需的时间
                put!(results, (job_id, exec_time))
            end
        end;
@@ -156,16 +157,16 @@ julia> function make_jobs(n)
 
 julia> n = 12;
 
-julia> @schedule make_jobs(n); # feed the jobs channel with "n" jobs
+julia> @async make_jobs(n); # 用 "n" 个 jobs 填充 jobs channel
 
-julia> for i in 1:4 # start 4 tasks to process requests in parallel
-           @schedule do_work()
+julia> for i in 1:4 # 启动 4 个 tasks 来并行的处理请求
+           @async do_work()
        end
 
-julia> @elapsed while n > 0 # print out results
+julia> @elapsed while n > 0 # 打印结果
            job_id, exec_time = take!(results)
-           println("$job_id finished in $(round(exec_time,2)) seconds")
-           n = n - 1
+           println("$job_id finished in $(round(exec_time; digits=2)) seconds")
+           global n = n - 1
        end
 4 finished in 0.22 seconds
 3 finished in 0.45 seconds
@@ -184,9 +185,10 @@ julia> @elapsed while n > 0 # print out results
 
 当前版本的 Julia 会将所有 task 分发到一个操作系统的线程，因此，涉及 I/O 的操作会从并行执行中获利，而计算密集型的 task 则会顺序地在单独这个线程上执行。未来 Julia 将支持在多个线程上调度 task，从而让计算密集型 task 也能从并行计算中获利。
 
-# 多线程（实验性功能）
+# [Multi-Threading (Experimental)](@id man-multithreading)
 
-除了 task 之外，Julia 还原生支持多线程。本部分内容是实验性的，未来相关接口可能会改变。
+In addition to tasks Julia natively supports multi-threading.
+Note that this section is experimental and the interfaces may change in the future.
 
 ## 设置
 
@@ -200,11 +202,24 @@ julia> Threads.nthreads()
 
 Julia 启动时的线程数可以通过环境变量 `JULIA_NUM_THREADS` 设置，下面启动4个线程：
 
+Bash on Linux/OSX:
+
 ```bash
 export JULIA_NUM_THREADS=4
 ```
 
-(上面的代码只能在 Linux 和 OSX 系统中运行，如果你在以上平台中使用的是 C shell，那么将 `export` 改成 `set`，如果你是在 Windows 上运行，那么将 `export` 改成 `set` 同时启动 Julia 时指定 `julia.exe` 的完整路径。)
+C shell on Linux/OSX, CMD on Windows:
+
+```bash
+set JULIA_NUM_THREADS=4
+```
+
+Powershell on Windows:
+
+```powershell
+$env:JULIA_NUM_THREADS=4
+```
+
 
 现在确认下确实有4个线程：
 
@@ -335,7 +350,14 @@ julia> acc[]
 ## 副作用和可变的函数参数
 
 
-在使用多线程时，要非常小心使用了不纯的函数 [pure function](https://en.wikipedia.org/wiki/Pure_function)，例如，用到了 [以!结尾的函数](https://docs.julialang.org/en/latest/manual/style-guide/#Append-!-to-names-of-functions-that-modify-their-arguments-1)，通常这类函数会修改其参数，因而是不纯的。此外还有些函数没有以 `!` 结尾，其实也是有副作用的，比如 [`findfirst(regex, str)`](@ref) 就会改变 `regex` 参数，或者是 [`rand()`](@ref) 会修改 `Base.GLOBAL_RNG`:
+When using multi-threading we have to be careful when using functions that are not
+[pure](https://en.wikipedia.org/wiki/Pure_function) as we might get a wrong answer.
+For instance functions that have their
+[name ending with `!`](@ref bang-convention)
+by convention modify their arguments and thus are not pure. However, there are
+functions that have side effects and their name does not end with `!`. For
+instance [`findfirst(regex, str)`](@ref) mutates its `regex` argument or
+[`rand()`](@ref) changes `Base.GLOBAL_RNG` :
 
 ```julia-repl
 julia> using Base.Threads
@@ -409,7 +431,7 @@ julia> function g_fix(r)
 g_fix (generic function with 1 method)
 
 julia>  r = let m = MersenneTwister(1)
-                [m; accumulate(Future.randjump, m, fill(big(10)^20, nthreads()-1))]
+                [m; accumulate(Future.randjump, fill(big(10)^20, nthreads()-1), init=m)]
             end;
 
 julia> g_fix(r)
@@ -447,10 +469,12 @@ Julia 的消息传递机制与一些其它的框架不太一样，比如 MPI [^1
 
 Julia 中的分布式编程基于两个基本概念：**远程引用**(*remote references*)和**远程调用**(*remote calls*)。远程引用是一个对象，任意一个进程可以通过它访问存储在某个特定进程上的对象。远程调用指是某个进程发起的执行函数的请求，该函数会在另一个（也可能是同一个）进程中执行。
 
-远程引用有两种类型：[`Future`](@ref) 和 [`RemoteChannel`](@ref)。
+Remote references come in two flavors: [`Future`](@ref Distributed.Future) and [`RemoteChannel`](@ref).
 
-一次远程调用会返回一个 [`Future`](@ref) 作为结果。远程调用会立即返回；也就是说，执行远程调用的进程接下来会继续执行下一个操作，而远程调用则会在另外的进程中进行。你可以通过对返回的 [`Future`](@ref) 执行 [`wait`](@ref) 操作来等待远程调用结束，然后用 [`fetch`](@ref) 获取结果。
-
+A remote call returns a [`Future`](@ref Distributed.Future) to its result. Remote calls return immediately; the process
+that made the call proceeds to its next operation while the remote call happens somewhere else.
+You can wait for a remote call to finish by calling [`wait`](@ref) on the returned [`Future`](@ref Distributed.Future),
+and you can obtain the full value of the result using [`fetch`](@ref).
 
 对于 [`RemoteChannel`](@ref) 而言，它可以被反复写入。例如，多个进程可以通过引用同一个远程 `Channel` 来协调相互之间的操作。
 
@@ -489,14 +513,14 @@ julia> remotecall_fetch(getindex, 2, r, 1, 1)
 回忆下，这里 [`getindex(r,1,1)`](@ref) [相当于](@ref man-array-indexing) `r[1,1]`，因此，上面的调用相当于获取 `r` 的第一个元素。
 
 
-[`remotecall`](@ref) 的语法不是很方便，有一个宏 [`@spawn`](@ref) 可以做些简化，其作用于一个表达式，而不是函数，同时会自动帮你选择在哪个进程上执行。
-
+To make things easier, the symbol `:any` can be passed to [`@spawnat`], which picks where to do
+the operation for you:
 
 ```julia-repl
-julia> r = @spawn rand(2,2)
+julia> r = @spawnat :any rand(2,2)
 Future(2, 1, 4, nothing)
 
-julia> s = @spawn 1 .+ fetch(r)
+julia> s = @spawnat :any 1 .+ fetch(r)
 Future(3, 1, 5, nothing)
 
 julia> fetch(s)
@@ -505,17 +529,38 @@ julia> fetch(s)
  1.20939  1.57158
 ```
 
-注意这里执行的是 `1 .+ fetch(r)` 而不是 `1 .+ r`。这是因为我们并不知道这段代码会在哪个进程中执行，因此，通常需要用 [`fetch`](@ref) 将 `r` 中的数据挪到当前计算加法的进程中。这时候 [`@spawn`](@ref) 会很智能地在拥有 `r` 的进程中执行计算，此时，[`fetch`](@ref) 就相当于什么都不用做。(译者注：[issue#28350](https://github.com/JuliaLang/julia/issues/28350))
+Note that we used `1 .+ fetch(r)` instead of `1 .+ r`. This is because we do not know where the
+code will run, so in general a [`fetch`](@ref) might be required to move `r` to the process
+doing the addition. In this case, [`@spawnat`](@ref) is smart enough to perform the computation
+on the process that owns `r`, so the [`fetch`](@ref) will be a no-op (no work is done).
 
-显然，[`@spawn`](@ref) 并非 Julia 内置的一部分，而是通过 [宏](@ref man-macros) 定义的，因此，你也可以自己定义类似的结构。
+(It is worth noting that [`@spawnat`](@ref) is not built-in but defined in Julia as a [macro](@ref man-macros).
+It is possible to define your own such constructs.)
 
-有一点一定要注意，一旦执行了 `fetch`，[`Future`](@ref) 就会将结果缓存起来，之后执行 [`fetch`](@ref) 的时候就不涉及到网络传输了。一旦所有的 [`Future`](@ref) 都获取到了值，那么远端存储的值就会被删掉。
+An important thing to remember is that, once fetched, a [`Future`](@ref Distributed.Future) will cache its value
+locally. Further [`fetch`](@ref) calls do not entail a network hop. Once all referencing [`Future`](@ref Distributed.Future)s
+have fetched, the remote stored value is deleted.
 
-[`@async`](@ref) 跟 [`@spawn`](@ref) 有点类似，不过只在当前局部线程中执行。通过它来给每个进程创建一个**喂养**的 task，每个 task 都选取下一个将要计算的索引，然后等待其执行结束，然后重复该过程，直到索引超出边界。需要注意的是，task 并不会立即执行，只有在执行到 [`@sync`](@ref) 结束时才会开始执行，此时，当前线程交出控制权，直到所有的任务都完成了。在v0.7之后，所有的喂养 task 都能够通过 `nextidx` 共享状态，因为他们都在同一个进程中。尽管 `Tasks` 是协调调度的，但在某些情况下仍然有可能发送死锁，如 [asynchronous I\O](https://docs.julialang.org/en/stable/manual/faq/#Asynchronous-IO-and-concurrent-synchronous-writes-1)。上下文只会在特定时候发生切换，在这里就是执行 [`remotecall_fetch`](@ref)。当然，这是当前版本（dev v0.7）的实现，未来版本中可能会改变，有望在 M 个进程中最多跑 N 个 task，即 [M:N 线程](https://en.wikipedia.org/wiki/Thread_(computing)#Models)。然后，`nextidx` 需要加锁，从而让多个进程能够安全地对一个资源同时进行读写。
+[`@async`](@ref) is similar to [`@spawnat`](@ref), but only runs tasks on the local process. We
+use it to create a "feeder" task for each process. Each task picks the next index that needs to
+be computed, then waits for its process to finish, then repeats until we run out of indices. Note
+that the feeder tasks do not begin to execute until the main task reaches the end of the [`@sync`](@ref)
+block, at which point it surrenders control and waits for all the local tasks to complete before
+returning from the function.
+As for v0.7 and beyond, the feeder tasks are able to share state via `nextidx` because
+they all run on the same process.
+Even if `Tasks` are scheduled cooperatively, locking may still be required in some contexts, as in
+[asynchronous I/O](@ref faq-async-io).
+This means context switches only occur at well-defined points: in this case,
+when [`remotecall_fetch`](@ref) is called. This is the current state of implementation and it may change
+for future Julia versions, as it is intended to make it possible to run up to N `Tasks` on M `Process`, aka
+[M:N Threading](https://en.wikipedia.org/wiki/Thread_(computing)#Models). Then a lock acquiring\releasing
+model for `nextidx` will be needed, as it is not safe to let multiple processes read-write a resource at
+the same time.
 
 
 
-## 访问代码以及加载库
+## [Code Availability and Loading Packages](@id code-availability)
 
 对于想要并行执行的代码，需要所有对所有线程都可见。例如，在 Julia 命令行中输入以下命令：
 
@@ -529,7 +574,7 @@ julia> rand2(2,2)
  0.153756  0.368514
  1.15119   0.918912
 
-julia> fetch(@spawn rand2(2,2))
+julia> fetch(@spawnat :any rand2(2,2))
 ERROR: RemoteException(2, CapturedException(UndefVarError(Symbol("#rand2"))
 Stacktrace:
 [...]
@@ -622,46 +667,63 @@ julia> addprocs(2)
 
 在 master 主线程中，`Distributed` 模块必须显式地在调用 [`addprocs`](@ref) 之前载入，该模块会自动在其它进程中可见。
 
-需要注意的时，worker 进程并不会执行 `~/.julia/config/startup.jl` 启动脚本，也不会同步其它进程的全局状态（比如全局变量，新定义的方法，加载的模块等）。
+Note that workers do not run a `~/.julia/config/startup.jl` startup script, nor do they synchronize
+their global state (such as global variables, new method definitions, and loaded modules) with any
+of the other running processes. You may use `addprocs(exeflags="--project")` to initialize a worker with
+a particular environment, and then `@everywhere using <modulename>` or `@everywhere include("file.jl")`.
 
-
-其它类型的集群可以通过自己写一个 `ClusterManager` 来实现，下面 [ClusterManagers](@ref) 部分会介绍。
+其它类型的集群可以通过自己写一个 `ClusterManager` 来实现，下面 [集群管理器](@ref) 部分会介绍。
 
 ## 数据转移
 
 分布式程序的性能瓶颈主要是由发送消息和数据转移造成的，减少发送消息和转移数据的数量对于获取高性能和可扩展性至关重要，因此，深入了解 Julia 分布式程序是如何转移数据的非常有必要。
 
-[`fetch`](@ref) 可以看作是显式地转移数据的操作，因为它直接要求获取数据到本地机器。[`@spawn`](@ref)（以及相关的操作）也会移动数据，不过不那么明显，因此称作隐式地数据转移操作。比较以下两种方式，构造一个随机矩阵并求平方：
+[`fetch`](@ref) can be considered an explicit data movement operation, since it directly asks
+that an object be moved to the local machine. [`@spawnat`](@ref) (and a few related constructs)
+also moves data, but this is not as obvious, hence it can be called an implicit data movement
+operation. Consider these two approaches to constructing and squaring a random matrix:
 
-方法1：
+方法一：
 
 ```julia-repl
 julia> A = rand(1000,1000);
 
-julia> Bref = @spawn A^2;
+julia> Bref = @spawnat :any A^2;
 
 [...]
 
 julia> fetch(Bref);
 ```
 
-Method 2:
+方法二：
 
 ```julia-repl
-julia> Bref = @spawn rand(1000,1000)^2;
+julia> Bref = @spawnat :any rand(1000,1000)^2;
 
 [...]
 
 julia> fetch(Bref);
 ```
 
-二者的差别似乎微乎其微，不过受于 [`@spawn`](@ref) 的实现，二者其实有很大的区别。第一种方法中，首先在本地构造了一个随机矩阵，然后将其发送到另外一个线程计算平方，而第二种方法中，随机矩阵的构造以及求平方计算都在另外一个进程。因此，第二种方法传输的数据要比第一种方法少得多。
+The difference seems trivial, but in fact is quite significant due to the behavior of [`@spawnat`](@ref).
+In the first method, a random matrix is constructed locally, then sent to another process where
+it is squared. In the second method, a random matrix is both constructed and squared on another
+process. Therefore the second method sends much less data than the first.
 
-
-在上面这个简单的例子中，两种方法很好区分并作出选择。不过，在实际的程序中设计如何转移数据时，需要经过深思熟虑。例如，如果第一个进程需要使用 `A`，那么第一种方法就更合适些。或者，如果计算 `A` 非常复杂，而所有的进程中又只有当前进程有数据 `A`，那么转移数据 `A` 就不可避免了。又或者，当前进程在 [`@spawn`](@ref) 和 `fetch(Bref)` 之间几乎没什么可做的，那么最好就不用并行了。又比如，假设 `rand(1000,1000)` 操作换成了某种非常复杂的操作，那么也许为这个操作再增加一个 [`@spawn`](@ref) 是个不错的方式。
+In this toy example, the two methods are easy to distinguish and choose from. However, in a real
+program designing data movement might require more thought and likely some measurement. For example,
+if the first process needs matrix `A` then the first method might be better. Or, if computing
+`A` is expensive and only the current process has it, then moving it to another process might
+be unavoidable. Or, if the current process has very little to do between the [`@spawnat`](@ref)
+and `fetch(Bref)`, it might be better to eliminate the parallelism altogether. Or imagine `rand(1000,1000)`
+is replaced with a more expensive operation. Then it might make sense to add another [`@spawnat`](@ref)
+statement just for this step.
 
 ## 全局变量
-通过 `@spawn` 在远端执行的表达式，或者通过 `remotecall` 调用的闭包，有可能引用全局变量。在 `Main` 模块中的全局绑定和其它模块中的全局绑定有所不同，来看看下面的例子:
+Expressions executed remotely via `@spawnat`, or closures specified for remote execution using
+`remotecall` may refer to global variables. Global bindings under module `Main` are treated
+a little differently compared to global bindings in other modules. Consider the following code
+snippet:
 
 ```julia-repl
 A = rand(10,10)
@@ -693,8 +755,7 @@ remotecall_fetch(()->sum(A), 2)
 
 因此，在远程调用中，需要非常小心地引用全局变量。事实上，应当尽量避免引用全局变量，如果必须引用，那么可以考虑用`let`代码块将全局变量局部化：
 
-例如：
-
+ 
 
 ```julia-repl
 julia> A = rand(10,10);
@@ -707,7 +768,7 @@ julia> let B = B
            remotecall_fetch(()->B, 2)
        end;
 
-julia> @fetchfrom 2 varinfo()
+julia> @fetchfrom 2 InteractiveUtils.varinfo()
 name           size summary
 ––––––––– ––––––––– ––––––––––––––––––––––
 A         800 bytes 10×10 Array{Float64,2}
@@ -721,7 +782,10 @@ Main                Module
 
 ## 并行的Map和Loop
 
-幸运的是，许多有用的并行计算并不涉及数据转移。一个典型的例子就是蒙特卡洛模拟，每个进程都独立地完成一些模拟试验。这里用 [`@spawn`](@ref) 在两个进程进行抛硬币的试验，首先，将下面的代码写入 `count_heads.jl` 文件:
+Fortunately, many useful parallel computations do not require data movement. A common example
+is a Monte Carlo simulation, where multiple processes can handle independent simulation trials
+simultaneously. We can use [`@spawnat`](@ref) to flip coins on two processes. First, write the following
+function in `count_heads.jl`:
 
 ```julia
 function count_heads(n)
@@ -738,10 +802,10 @@ end
 ```julia-repl
 julia> @everywhere include_string(Main, $(read("count_heads.jl", String)), "count_heads.jl")
 
-julia> a = @spawn count_heads(100000000)
+julia> a = @spawnat :any count_heads(100000000)
 Future(2, 1, 6, nothing)
 
-julia> b = @spawn count_heads(100000000)
+julia> b = @spawnat :any count_heads(100000000)
 Future(3, 1, 7, nothing)
 
 julia> fetch(a)+fetch(b)
@@ -750,7 +814,10 @@ julia> fetch(a)+fetch(b)
 
 上面的例子展示了一种非常常见而且有用的并行编程模式，在一些进程中执行多次独立的迭代，然后将它们的结果通过某个函数合并到一起，这个合并操作通常称作**聚合**(*reduction*)，也就是一般意义上的**张量降维**(tensor-rank-reducing)，比如将一个向量降维成一个数，或者是将一个 tensor 降维到某一行或者某一列等。在代码中，通常具有 `x = f(x, v[i])` 这种形式，其中 `x` 是一个叠加器，`f` 是一个聚合函数，而 `v[i]` 则是将要被聚合的值。一般来说，`f` 要求满足结合律，这样不管执行的顺序如何，都不会影响计算结果。
 
-前面的代码中，调用 `count_heads` 的方式可以被抽象出来，之前我们显式地调用了两次 [`@spawn`](@ref)，这将并行计算限制在了两个进程上，为了将并行计算扩展到任意多进程，可以使用 *parallel for loop* 这种形式，在 Julia 中可以用 [`@distributed`](@ref) 宏来实现：
+Notice that our use of this pattern with `count_heads` can be generalized. We used two explicit
+[`@spawnat`](@ref) statements, which limits the parallelism to two processes. To run on any number
+of processes, we can use a *parallel for loop*, running in distributed memory, which can be written
+in Julia using [`@distributed`](@ref) like this:
 
 ```julia
 nheads = @distributed (+) for i = 1:200000000
@@ -771,7 +838,7 @@ a = zeros(100000)
 end
 ```
 
-这段代码并不会把 `a` 的所有元素初始化，因为每个进程都会有一份 `a` 的拷贝，因此类似的 for 循环一定要避免。幸运的是，[Shared Arrays](@ref man-shared-arrays) 可以用来突破这种限制：
+这段代码并不会把 `a` 的所有元素初始化，因为每个进程都会有一份 `a` 的拷贝，因此类似的 for 循环一定要避免。幸运的是，[共享数组](@ref man-shared-arrays) 可以用来突破这种限制：
 
 ```julia
 using SharedArrays
@@ -793,7 +860,11 @@ end
 
 这里每次迭代都会从共享给每个进程的向量 `a` 中随机选一个样本，然后用来计算 `f`。
 
-可以看到，如果不需要的话，聚合函数可以省略掉，此时，for 循环会异步执行，将独立的任务发送给所有的进程，然后不用等待执行完成，而是立即返回一个 [`Future`](@ref) 数组，调用者可以在之后的某个时刻通过调用 [`fetch`](@ref) 来等待 [`Future`](@ref) 执行完成，或者通过在并行的 for 循环之前添加一个 [`@sync`](@ref)，就像`@sync @distributed for`。
+As you could see, the reduction operator can be omitted if it is not needed. In that case, the
+loop executes asynchronously, i.e. it spawns independent tasks on all available workers and returns
+an array of [`Future`](@ref Distributed.Future) immediately without waiting for completion. The caller can wait for
+the [`Future`](@ref Distributed.Future) completions at a later point by calling [`fetch`](@ref) on them, or wait
+for completion at the end of the loop by prefixing it with [`@sync`](@ref), like `@sync @distributed for`.
 
 在一些不需要聚合函数的情况下，我们可能只是像对某个范围内的整数应用一个函数(或者，更一般地，某个序列中的所有元素)，这种操作称作**并行的 map**，在 Julia 中有一个对应的函数 [`pmap`](@ref)。例如，可以像下面这样计算一些随机大矩阵的奇异值：
 
@@ -809,7 +880,10 @@ Julia 中的 [`pmap`](@ref) 是被设计用来处理一些计算量比较复杂�
 
 远程引用通常指某种 `AbstractChannel` 的实现。
 
-一个具体的 `AbstractChannel`（有点像 `Channel`）需要将 [`put!`](@ref), [`take!`](@ref), [`fetch`](@ref), [`isready`](@ref) 和 [`wait`](@ref) 都实现。通过 [`Future`](@ref) 引用的远程对象存储在一个 `Channel{Any}(1)` 中（容量为 1，类型为 `Any`）。
+A concrete implementation of an `AbstractChannel` (like `Channel`), is required to implement
+[`put!`](@ref), [`take!`](@ref), [`fetch`](@ref), [`isready`](@ref) and [`wait`](@ref).
+The remote object referred to by a [`Future`](@ref Distributed.Future) is stored in a `Channel{Any}(1)`, i.e., a
+`Channel` of size 1 capable of holding objects of `Any` type.
 
 [`RemoteChannel`](@ref) 可以被反复写入，可以指向任意大小和类型的 channel（或者是任意 `AbstractChannel` 的实现）。
 
@@ -819,7 +893,7 @@ Julia 中的 [`pmap`](@ref) 是被设计用来处理一些计算量比较复杂�
 
 针对 [`RemoteChannel`](@ref) 的 [`put!`](@ref), [`take!`](@ref), [`fetch`](@ref), [`isready`](@ref) 和 [`wait`](@ref) 方法会被重定向到其底层存储着 channel 的进程。
 
-因此，[`RemoteChannel`](@ref) 可以用来引用用户自定义的 `AbstractChannel` 对象。在 [Examples repository](https://github.com/JuliaArchive/Examples) 中的 `dictchannel.jl` 文件中有一个简单的例子，其中使用了一个字典用于远端存储。
+因此，[`RemoteChannel`](@ref) 可以用来引用用户自定义的 `AbstractChannel` 对象。在 [Examples repository](https://github.com/JuliaAttic/Examples) 中的 `dictchannel.jl` 文件中有一个简单的例子，其中使用了一个字典用于远端存储。
 
 
 ## Channel 和 RemoteChannel
@@ -875,8 +949,8 @@ julia> for p in workers() # start tasks on the workers to process requests in pa
 
 julia> @elapsed while n > 0 # print out results
            job_id, exec_time, where = take!(results)
-           println("$job_id finished in $(round(exec_time,2)) seconds on worker $where")
-           n = n - 1
+           println("$job_id finished in $(round(exec_time; digits=2)) seconds on worker $where")
+           global n = n - 1
        end
 1 finished in 0.18 seconds on worker 4
 2 finished in 0.26 seconds on worker 5
@@ -897,21 +971,125 @@ julia> @elapsed while n > 0 # print out results
 
 远程引用所指向的对象可以在其所有引用都被集群删除之后被释放掉。
 
-存储具体值的节点会记录哪些 worker 已经引用了它。每当某个 [`RemoteChannel`](@ref) 或某个（还没被获取的）[`Future`](@ref) 序列化到一个 worker 中时，会通知相应的节点。而且每当某个 [`RemoteChannel`](@ref) 或某个（还没被获取的）[`Future`](@ref) 被本地的垃圾回收器回收的时候，相应的节点也会收到通知。所有这些都是通过一个集群内部序列化器实现的，而所有的远程引用都只有在运行中的集群才有效，目前序列化和反序列化到 `IO` 暂时还不支持。
+The node where the value is stored keeps track of which of the workers have a reference to it.
+Every time a [`RemoteChannel`](@ref) or a (unfetched) [`Future`](@ref Distributed.Future) is serialized to a worker,
+the node pointed to by the reference is notified. And every time a [`RemoteChannel`](@ref) or
+a (unfetched) [`Future`](@ref Distributed.Future) is garbage collected locally, the node owning the value is again
+notified. This is implemented in an internal cluster aware serializer. Remote references are only
+valid in the context of a running cluster. Serializing and deserializing references to and from
+regular `IO` objects is not supported.
 
 上面说到的**通知**都是通过发送"跟踪"信息来实现的，当一个引用被序列化的时候，就会发送"添加引用"的信息，而一个引用被本地的垃圾回收器回收的时候，就会发送一个"删除引用"的信息。
 
-由于 [`Future`](@ref) 是一次写入然后换成在本地，因此 [`fetch`](@ref) 一个 [`Future`](@ref) 会向拥有该值的节点发送更新引用的跟踪信息。
+Since [`Future`](@ref Distributed.Future)s are write-once and cached locally, the act of [`fetch`](@ref)ing a
+[`Future`](@ref Distributed.Future) also updates reference tracking information on the node owning the value.
 
 一旦指向某个值的引用都被删除了，对应的节点会将其释放。
 
-对于 [`Future`](@ref) 来说，序列化一个已经获取了值的 [`Future`](@ref) 到另外一个节点时，会将其值也一并序列化过去，因为原始的远端的值可能已经被回收释放了。
+With [`Future`](@ref Distributed.Future)s, serializing an already fetched [`Future`](@ref Distributed.Future) to a different node also
+sends the value since the original remote store may have collected the value by this time.
 
 此外需要注意的是，本地的垃圾回收到底发生在什么时候取决于具体对象的大小以及当时系统的内存压力。
 
-对于远端引用，其引用本身的大小很小，不过在远端节点存储着的值可能相当大。由于本地的对象并不会立即被回收，于是一个比较好的做法是，对本地的 [`RemoteChannel`](@ref) 或者是还没获取值的 [`Future`](@ref) 执行 [`finalize`](@ref)。对于已经获取了值的 [`Future`](@ref) 来说，由于已经在调用 [`fetch`](@ref) 的时候已经将引用删除了，因此就不必再 [`finalize`](@ref) 了。显式地调用 [`finalize`](@ref) 会立即向远端节点发送信息并删除其引用。
+In case of remote references, the size of the local reference object is quite small, while the
+value stored on the remote node may be quite large. Since the local object may not be collected
+immediately, it is a good practice to explicitly call [`finalize`](@ref) on local instances
+of a [`RemoteChannel`](@ref), or on unfetched [`Future`](@ref Distributed.Future)s. Since calling [`fetch`](@ref)
+on a [`Future`](@ref Distributed.Future) also removes its reference from the remote store, this is not required on
+fetched [`Future`](@ref Distributed.Future)s. Explicitly calling [`finalize`](@ref) results in an immediate message
+sent to the remote node to go ahead and remove its reference to the value.
 
 一旦执行了 finalize 之后，引用就不可用了。
+
+
+## Local invocations
+
+Data is necessarily copied over to the remote node for execution. This is the case for both
+remotecalls and when data is stored to a[`RemoteChannel`](@ref) / [`Future`](@ref Distributed.Future) on
+a different node. As expected, this results in a copy of the serialized objects
+on the remote node. However, when the destination node is the local node, i.e.
+the calling process id is the same as the remote node id, it is executed
+as a local call. It is usually(not always) executed in a different task - but there is no
+serialization/deserialization of data. Consequently, the call refers to the same object instances
+as passed - no copies are created. This behavior is highlighted below:
+
+```julia-repl
+julia> using Distributed;
+
+julia> rc = RemoteChannel(()->Channel(3));   # RemoteChannel created on local node
+
+julia> v = [0];
+
+julia> for i in 1:3
+           v[1] = i                          # Reusing `v`
+           put!(rc, v)
+       end;
+
+julia> result = [take!(rc) for _ in 1:3];
+
+julia> println(result);
+Array{Int64,1}[[3], [3], [3]]
+
+julia> println("Num Unique objects : ", length(unique(map(objectid, result))));
+Num Unique objects : 1
+
+julia> addprocs(1);
+
+julia> rc = RemoteChannel(()->Channel(3), workers()[1]);   # RemoteChannel created on remote node
+
+julia> v = [0];
+
+julia> for i in 1:3
+           v[1] = i
+           put!(rc, v)
+       end;
+
+julia> result = [take!(rc) for _ in 1:3];
+
+julia> println(result);
+Array{Int64,1}[[1], [2], [3]]
+
+julia> println("Num Unique objects : ", length(unique(map(objectid, result))));
+Num Unique objects : 3
+```
+
+As can be seen, [`put!`](@ref) on a locally owned [`RemoteChannel`](@ref) with the same
+object `v` modifed between calls results in the same single object instance stored. As
+opposed to copies of `v` being created when the node owning `rc` is a different node.
+
+It is to be noted that this is generally not an issue. It is something to be factored in only
+if the object is both being stored locally and modifed post the call. In such cases it may be
+appropriate to store a `deepcopy` of the object.
+
+This is also true for remotecalls on the local node as seen in the following example:
+
+```julia-repl
+julia> using Distributed; addprocs(1);
+
+julia> v = [0];
+
+julia> v2 = remotecall_fetch(x->(x[1] = 1; x), myid(), v);     # Executed on local node
+
+julia> println("v=$v, v2=$v2, ", v === v2);
+v=[1], v2=[1], true
+
+julia> v = [0];
+
+julia> v2 = remotecall_fetch(x->(x[1] = 1; x), workers()[1], v); # Executed on remote node
+
+julia> println("v=$v, v2=$v2, ", v === v2);
+v=[0], v2=[1], false
+```
+
+As can be seen once again, a remote call onto the local node behaves just like a direct invocation.
+The call modifies local objects passed as arguments. In the remote invocation, it operates on
+a copy of the arguments.
+
+To repeat, in general this is not an issue. If the local node is also being used as a compute
+node, and the arguments used post the call, this behavior needs to be factored in and if required
+deep copies of arguments must be passed to the call invoked on the local node. Calls on remote nodes
+will always operate on copies of arguments.
+
 
 ## [共享数组](@id man-shared-arrays)
 
@@ -945,7 +1123,7 @@ julia> addprocs(3)
 
 julia> @everywhere using SharedArrays
 
-julia> S = SharedArray{Int,2}((3,4), init = S -> S[localindices(S)] = myid())
+julia> S = SharedArray{Int,2}((3,4), init = S -> S[localindices(S)] = repeat([myid()], length(localindices(S))))
 3×4 SharedArray{Int64,2}:
  2  2  3  4
  2  3  3  4
@@ -964,7 +1142,7 @@ julia> S
 [`SharedArrays.localindices`](@ref) 提供了一个以为的切片，可以很方便地用来将 task 分配到各个进程上。当然你可以按你想要的方式做区分：
 
 ```julia-repl
-julia> S = SharedArray{Int,2}((3,4), init = S -> S[indexpids(S):length(procs(S)):length(S)] = myid())
+julia> S = SharedArray{Int,2}((3,4), init = S -> S[indexpids(S):length(procs(S)):length(S)] = repeat([myid()], length( indexpids(S):length(procs(S)):length(S))))
 3×4 SharedArray{Int64,2}:
  2  2  2  2
  3  3  3  3
@@ -1091,7 +1269,7 @@ julia> @time advection_shared!(q,u);
 
 和远程引用一样，共享数组也依赖于创建节点上的垃圾回收来释放所有参与的 worker 上的引用。因此，创建大量生命周期比较短的数组，并尽可能快地显式 finilize 这些对象，代码会更高效，这样与之对用的内存和文件句柄都会更快地释放。
 
-## 集群管理器（ClusterManagers）
+## 集群管理器
 
 Julia 通过集群管理器实现对多个进程（所构成的逻辑上的集群）的启动，管理以及网络通信。一个 `ClusterManager` 负责：
 
@@ -1263,8 +1441,7 @@ kill(manager::FooManager, pid::Int, config::WorkerConfig)
 
 `BufferStream` 是一个内存中的 [`IOBuffer`](@ref)，其表现很像 `IO`，就是一个**流**（stream），可以异步地处理。
 
-在 [Examples repository](https://github.com/JuliaArchive/Examples)的 `clustermanager/0mq` 目录中，包含一个使用 ZeroMQ 连接 Julia worker 的例子，用的是星型拓补结构。需要注意的是：Julia 的进程仍然是**逻辑上**相互连接的，任意 worker 都可以与其它 worker 直接相连而无需感知到 0MQ 作为传输层的存在。
-
+在 [Examples repository](https://github.com/JuliaAttic/Examples) 的 `clustermanager/0mq` 目录中，包含一个使用 ZeroMQ 连接 Julia worker 的例子，用的是星型拓补结构。需要注意的是：Julia 的进程仍然是**逻辑上**相互连接的，任意 worker 都可以与其它 worker 直接相连而无需感知到 0MQ 作为传输层的存在。
 
 在使用自定义传输的时候：
 
@@ -1306,7 +1483,7 @@ Julia 集群设计的时候，默认是在一个安全的环境中执行，比�
     运行 Julia ERPL （做为 master）和云上的其他机器，比如 Amazon EC2，构成集群。
     这时候远程机器只要开启 22 端口就可以，然后要有 SSH 客户端
     通过公约基础设施（PKI）认证过。授权信息可以通过
-    `sshflags` 生效，比如 ``` sshflags=`-e<keyfile>` ```。
+    `sshflags` 生效，比如 ```sshflags=`-i <keyfile>` ```。
 
     在一个所有节点联通的拓扑网中（默认情况下是这样的），所有的 worker 节点都通过普通 TCP socket 通信互相连接。
     这样集群的安全策略就必须允许 worker 节点间
@@ -1348,7 +1525,7 @@ Julia 集群设计的时候，默认是在一个安全的环境中执行，比�
 
 ## 一些值得关注的外部库
 
-除了 Julia 自带的并行机制之外，还有许多外部的库值得一提。例如 [MPI.jl](https://github.com/JuliaParallel/MPI.jl) 提供了一个 `MPI` 协议的 Julia 的封装，或者是在 [Shared Arrays](@ref) 提到的 [DistributedArrays.jl](https://github.com/JuliaParallel/Distributedarrays.jl)，此外尤其值得一提的是 Julia 的 GPU 编程生态，包括：
+除了 Julia 自带的并行机制之外，还有许多外部的库值得一提。例如 [MPI.jl](https://github.com/JuliaParallel/MPI.jl) 提供了一个 `MPI` 协议的 Julia 的封装，或者是在 [共享数组](@ref) 提到的 [DistributedArrays.jl](https://github.com/JuliaParallel/Distributedarrays.jl)，此外尤其值得一提的是 Julia 的 GPU 编程生态，其包括：
 
 1. 底层（C内核）的 [OpenCL.jl](https://github.com/JuliaGPU/OpenCL.jl) 和 [CUDAdrv.jl](https://github.com/JuliaGPU/CUDAdrv.jl)，分别提供了 OpenCL 和 CUDA 的封装。
 
@@ -1485,10 +1662,10 @@ mpirun -np 4 ./julia example.jl
 ```
 
 [^1]:
-    in this context, mpi refers to the mpi-1 standard. beginning with mpi-2, the mpi standards committee
-    introduced a new set of communication mechanisms, collectively referred to as remote memory access
-    (rma). the motivation for adding rma to the mpi standard was to facilitate one-sided communication
-    patterns. for additional information on the latest mpi standard, see [http://mpi-forum.org/docs](http://mpi-forum.org/docs/).
+    In this context, MPI refers to the MPI-1 standard. Beginning with MPI-2, the MPI standards committee
+    introduced a new set of communication mechanisms, collectively referred to as Remote Memory Access
+    (RMA). The motivation for adding rma to the MPI standard was to facilitate one-sided communication
+    patterns. For additional information on the latest MPI standard, see <https://mpi-forum.org/docs>.
 
 [^2]:
     [Julia GPU 手册](http://juliagpu.github.io/CUDAnative.jl/stable/man/usage.html#Julia-support-1)

@@ -1,4 +1,4 @@
-# 变量
+# [Variables](@id man-variables)
 
 Julia 语言中，变量是与某个值相关联（或绑定）的名字。你可以用它来保存一个值（例如某些计算得到的结果），供之后的代码使用。例如：
 
@@ -74,13 +74,13 @@ julia> pi
 π = 3.1415926535897...
 
 julia> pi = 3
-ERROR: cannot assign variable MathConstants.pi from module Main
+ERROR: cannot assign a value to variable MathConstants.pi from module Main
 
 julia> sqrt(100)
 10.0
 
 julia> sqrt = 4
-ERROR: cannot assign variable Base.sqrt from module Main
+ERROR: cannot assign a value to variable Base.sqrt from module Main
 ```
 
 ## 合法的变量名

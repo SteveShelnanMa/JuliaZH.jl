@@ -6,31 +6,31 @@ Julia 的很多能力和扩展性都来自于一些非正式的接口。通过�
 
 | 必需方法               |                        | 简短描述                                                                     |
 |:------------------------------ |:---------------------- |:------------------------------------------------------------------------------------- |
-| `iterate(iter)`                |                        | 通常返回由第一项及其其初始状态组成的元组，但如果是空，则要么返回[`nothing`](@ref)         |
+| `iterate(iter)`                |                        | 通常返回由第一项及其初始状态组成的元组，但如果为空，则返回 [`nothing`](@ref)         |
 | `iterate(iter, state)`         |                        | 通常返回由下一项及其状态组成的元组，或者在没有下一项存在时返回 `nothing`。  |
 | **重要可选方法** | **默认定义** | **简短描述**                                                                 |
-| `IteratorSize(IterType)`       | `HasLength()`          |  `HasLength()` ， `HasShape{N}()` ，  `IsInfinite()` ， 或者 `SizeUnknown()` 作为合适的 |
-| `IteratorEltype(IterType)`     | `HasEltype()`          | `EltypeUnknown()`  和 `HasEltype()`  都是可接受的                              |
-| `eltype(IterType)`             | `Any`                  | 元组中第一个条目的类型由 `iterate()` 返回。                      |
-| `length(iter)`                 | (*未定义*)          | 条目数，如果已知                                                         |
-| `size(iter, [dim...])`         | (*未定义*)          | 在各个维度上条目的数量，如果知道                                       |
+| `IteratorSize(IterType)`       | `HasLength()`          | `HasLength()`，`HasShape{N}()`，`IsInfinite()` 或者 `SizeUnknown()` 中合适的一个 |
+| `IteratorEltype(IterType)`     | `HasEltype()`          | `EltypeUnknown()` 或 `HasEltype()` 中合适的一个                              |
+| `eltype(IterType)`             | `Any`                  | 由 `iterate()` 返回元组中第一项的类型。                      |
+| `length(iter)`                 | (*未定义*)          | 项数，如果已知                                                         |
+| `size(iter, [dim])`            | (*未定义*)          | 在各个维度上项数，如果已知                                       |
 
-|  `IteratorSize(IterType)` 返回的值。 | 必需方法                           |
+| 由 `IteratorSize(IterType)` 返回的值 | 必需方法                           |
 |:------------------------------------------ |:------------------------------------------ |
 | `HasLength()`                              | [`length(iter)`](@ref)                     |
-| `HasShape{N}()`                            | `length(iter)` 和 `size(iter, [dim...])` |
-| `IsInfinite()`                             | (*none*)                                   |
-| `SizeUnknown()`                            | (*none*)                                   |
+| `HasShape{N}()`                            | `length(iter)` 和 `size(iter, [dim])`    |
+| `IsInfinite()`                             | (*无*)                                   |
+| `SizeUnknown()`                            | (*无*)                                   |
 
 | 由 `IteratorEltype(IterType)` 返回的值 | 必需方法   |
 |:-------------------------------------------- |:------------------ |
 | `HasEltype()`                                | `eltype(IterType)` |
 | `EltypeUnknown()`                            | (*none*)           |
 
-顺序迭代由  [`iterate`](@ref) 函数实现. 
-Julia的迭代器可以从目标外部跟踪迭代状态，而不是在迭代过程中改变目标本身。
-迭代过程中的返回一个包含了当前迭代值及其状态的元组，或者在没有元素存在的情况下返回  `nothing`  。
-状态对象将在下一次迭代时传递回迭代函数 并且通常被认为是可迭代对象的私有实现细节。
+顺序迭代由 [`iterate`](@ref) 函数实现。
+Julia 的迭代器可以从对象外部跟踪迭代状态，而不是在迭代过程中改变对象本身。
+迭代过程中的返回一个包含了当前迭代值及其状态的元组，或者在没有元素存在的情况下返回 `nothing`。
+状态对象将在下一次迭代时传递回 iterate 函数，并且通常被认为是可迭代对象的私有实现细节。
 
 任何定义了这个函数的对象都是可迭代的，并且可以被应用到[许多依赖迭代的函数上](@ref lib-collections-iteration) 。
 也可以直接被应用到  [`for`](@ref) 循环中，因为根据语法：
@@ -92,7 +92,7 @@ julia> std(Squares(100))
 3024.355854282583
 ```
 
-我们可以扩展一些其它的方法，为Julia提供有关此可迭代集合的更多信息。我们知道 `Squares` 序列中的元素总是 `Int` 型的。通过扩展 [`eltype`](@ref) 方法，我们可以给 Julia 过多的信息来帮助其在更复杂的方法中产生更加具体的代码。我们同时也知道我们序列中的元素数目，所以我们也同样可以扩展 [`length`](@ref)：
+我们可以扩展一些其它的方法，为 Julia 提供有关此可迭代集合的更多信息。我们知道 `Squares` 序列中的元素总是 `Int` 型的。通过扩展 [`eltype`](@ref) 方法，我们可以给 Julia 更多信息来帮助其在更复杂的方法中生成更具体的代码。我们同时也知道该序列中的元素数目，故同样地也可以扩展 [`length`](@ref)：
 
 ```jldoctest squaretype
 julia> Base.eltype(::Type{Squares}) = Int # Note that this is defined for the type
@@ -100,7 +100,7 @@ julia> Base.eltype(::Type{Squares}) = Int # Note that this is defined for the ty
 julia> Base.length(S::Squares) = S.count
 ```
 
-现在，当我们让Julia去  [`collect`](@ref) 所有元素到一个array中时，Julia可以预分配一个 适当大小的  `Vector{Int}` ，而不是盲目地  [`push!`](@ref) 每一个元素到 `Vector{Any}` ：
+现在，当我们让 Julia 去 [`collect`](@ref) 所有元素到一个数组中时，Julia 可以预分配一个适当大小的 `Vector{Int}`，而不是盲目地 [`push!`](@ref) 每一个元素到 `Vector{Any}`：
 
 ```jldoctest squaretype
 julia> collect(Squares(4))
@@ -111,7 +111,7 @@ julia> collect(Squares(4))
  16
 ```
 
-尽管大多时候我们都可以依赖于一些通用的实现，某些时候如果我们知道有一个更简单的算法的话，可以扩展出更具体的方法。例如，计算平方和有一个公式，因此可以扩展出一个更高效的解法：
+尽管大多时候我们都可以依赖一些通用的实现，但某些时候，如果我们知道一个更简单的算法，可以用其扩展具体方法。例如，计算平方和有公式，因此可以扩展出一个更高效的解法来替代通用方法：
 
 ```jldoctest squaretype
 julia> Base.sum(S::Squares) = (n = S.count; return n*(n+1)*(2n+1)÷6)
@@ -120,9 +120,9 @@ julia> sum(Squares(1803))
 1955361914
 ```
 
-这种模式在Julia Base中很常见，一些必须实现的方法构成了一个小的集合，从而定义出一个非正式的接口，用于实现一些非常炫酷的操作。某些时候，类型本身知道在其应用场景中有一些更高效的算法，因而可以扩展出额外方法。
+这种模式在 Julia Base 中很常见，一些必须实现的方法构成了一个小的集合，从而定义出一个非正式的接口，用于实现一些更加炫酷的操作。某些应用场景中，一些类型有更高效的算法，故可以扩展出额外的专用方法。
 
-能以*逆序*迭代集合也很有用，这可通过迭代 [`Iterators.reverse(iterator)`](@ref) 实现。但是，为了实际支持逆序迭代，迭代器类型 `T` 需要为 `Iterators.Reverse{T}` 实现 `iterate`。（给定 `r::Iterators.Reverse{T}`，类型 `T` 的底层迭代器是 `r.itr`。）在我们的 `Squares` 示例中，我们将实现 `Iterators.Reverse{Squares}` 方法：
+能以*逆序*迭代集合也很有用，这可由 [`Iterators.reverse(iterator)`](@ref) 迭代实现。但是，为了实际支持逆序迭代，迭代器类型 `T` 需要为 `Iterators.Reverse{T}` 实现 `iterate`。（给定 `r::Iterators.Reverse{T}`，类型 `T` 的底层迭代器是 `r.itr`。）在我们的 `Squares` 示例中，我们可以实现 `Iterators.Reverse{Squares}` 方法：
 
 ```jldoctest squaretype
 julia> Base.iterate(rS::Iterators.Reverse{Squares}, state=rS.itr.count) = state < 1 ? nothing : (state*state, state-1)
@@ -135,16 +135,18 @@ julia> collect(Iterators.reverse(Squares(4)))
   1
 ```
 
-## 索引
+## Indexing
 
-| 需要实现的方法 | 简介 |
+| Methods to implement | Brief description                |
 |:-------------------- |:-------------------------------- |
-| `getindex(X, i)` | `X[i]`，索引元素访问 |
-| `setindex!(X, v, i)` | `X[i] = v`，索引元素赋值 |
-| `firstindex(X)` | 第一个索引 |
-| `lastindex(X)` | 最后一个索引，用于 `X[end]` |
+| `getindex(X, i)`     | `X[i]`, indexed element access   |
+| `setindex!(X, v, i)` | `X[i] = v`, indexed assignment   |
+| `firstindex(X)`         | The first index, used in `X[begin]` |
+| `lastindex(X)`           | The last index, used in `X[end]` |
 
-对于 `Squares` 类型而言，可以通过对第 `i` 个元素求平方计算出其中的第 `i` 个元素，可以用 `S[i]` 的索引表达式形式暴露该接口。为了支持该行为，`Squares` 只需要简单地定义 [`getindex`](@ref)：
+For the `Squares` iterable above, we can easily compute the `i`th element of the sequence by squaring
+it.  We can expose this as an indexing expression `S[i]`. To opt into this behavior, `Squares`
+simply needs to define [`getindex`](@ref):
 
 ```jldoctest squaretype
 julia> function Base.getindex(S::Squares, i::Int)
@@ -156,7 +158,8 @@ julia> Squares(100)[23]
 529
 ```
 
-另外，为了支持语法 `S[end]`，我们必须定义 [`lastindex`](@ref) 来指定最后一个有效索引。建议也定义 [`firstindex`](@ref) 来指定第一个有效索引：
+Additionally, to support the syntax `S[begin]` and `S[end]`, we must define [`firstindex`](@ref) and
+[`lastindex`](@ref) to specify the first and last valid indices, respectively:
 
 ```jldoctest squaretype
 julia> Base.firstindex(S::Squares) = 1
@@ -187,25 +190,25 @@ julia> Squares(10)[[3,4.,5]]
 
 | 需要实现的方法                            |                                        | 简短描述                                                                     |
 |:----------------------------------------------- |:-------------------------------------- |:------------------------------------------------------------------------------------- |
-| `size(A)`                                       |                                        | 返回包含 `A` 维度的元组                                      |
-| `getindex(A, i::Int)`                           |                                        | （如果 `IndexLinear`）线性标量索引                                             |
-| `getindex(A, I::Vararg{Int, N})`                |                                        | （如果 `IndexCartesian`，其中 `N = ndims(A)`）N 维标量索引             |
-| `setindex!(A, v, i::Int)`                       |                                        | （如果 `IndexLinear`）线性索引元素赋值                                          |
-| `setindex!(A, v, I::Vararg{Int, N})`            |                                        | （如果 `IndexCartesian`，其中 `N = ndims(A)`）N 维标量索引元素赋值   |
+| `size(A)`                                       |                                        | 返回包含 `A` 各维度大小的元组                                      |
+| `getindex(A, i::Int)`                           |                                        | （若为 `IndexLinear`）线性标量索引                                             |
+| `getindex(A, I::Vararg{Int, N})`                |                                        | （若为 `IndexCartesian`，其中 `N = ndims(A)`）N 维标量索引             |
+| `setindex!(A, v, i::Int)`                       |                                        | （若为 `IndexLinear`）线性索引元素赋值                                          |
+| `setindex!(A, v, I::Vararg{Int, N})`            |                                        | （若为 `IndexCartesian`，其中 `N = ndims(A)`）N 维标量索引元素赋值   |
 | **可选方法**                            | **默认定义**                 | **简短描述**                                                                 |
 | `IndexStyle(::Type)`                            | `IndexCartesian()`                     | 返回 `IndexLinear()` 或 `IndexCartesian()`。请参阅下文描述。      |
 | `getindex(A, I...)`                             | 基于标量 `getindex` 定义  | [多维非标量索引](@ref man-array-indexing)                    |
-| `setindex!(A, I...)`                            | 基于标量 `setindex!` 定义 | [多维非标量索引元素赋值](@ref man-array-indexing)          |
+| `setindex!(A, X, I...)`                            | 基于标量 `setindex!` 定义 | [多维非标量索引元素赋值](@ref man-array-indexing)          |
 | `iterate`                                       | 基于标量 `getindex` 定义  | Iteration                                                                             |
 | `length(A)`                                     | `prod(size(A))`                        | 元素数                                                                    |
 | `similar(A)`                                    | `similar(A, eltype(A), size(A))`       | 返回具有相同形状和元素类型的可变数组                           |
 | `similar(A, ::Type{S})`                         | `similar(A, S, size(A))`               | 返回具有相同形状和指定元素类型的可变数组             |
-| `similar(A, dims::NTuple{Int})`                 | `similar(A, eltype(A), dims)`          | 返回具有相同元素类型和大小为 *dims* 的可变数组                     |
-| `similar(A, ::Type{S}, dims::NTuple{Int})`      | `Array{S}(undef, dims)`               | 返回具有指定元素类型及大小的可变数组                       |
+| `similar(A, dims::Dims)`                        | `similar(A, eltype(A), dims)`          | 返回具有相同元素类型和大小为 *dims* 的可变数组                     |
+| `similar(A, ::Type{S}, dims::Dims)`             | `Array{S}(undef, dims)`                | 返回具有指定元素类型及大小的可变数组                       |
 | **不遵循惯例的索引**                     | **默认定义**                 | **简短描述**                                                                 |
 | `axes(A)`                                    | `map(OneTo, size(A))`                  | 返回有效索引的 `AbstractUnitRange`                                       |
-| `Base.similar(A, ::Type{S}, inds::NTuple{Ind})` | `similar(A, S, Base.to_shape(inds))`   | 返回使用特殊索引 `inds` 的可变数组（详见下文）                  |
-| `Base.similar(T::Union{Type,Function}, inds)`   | `T(Base.to_shape(inds))`               | 返回类似于 `T` 的使用特殊索引 `inds` 的数组（详见下文）          |
+| `similar(A, ::Type{S}, inds)`              | `similar(A, S, Base.to_shape(inds))`   | 返回使用特殊索引 `inds` 的可变数组（详见下文）                  |
+| `similar(T::Union{Type,Function}, inds)`   | `T(Base.to_shape(inds))`               | 返回类似于 `T` 的使用特殊索引 `inds` 的数组（详见下文）          |
 
 如果一个类型被定义为 `AbstractArray` 的子类型，那它就继承了一大堆丰富的行为，包括构建在单元素访问之上的迭代和多维索引。有关更多支持的方法，请参阅文档 [多维数组](@ref man-multi-dim-arrays) 及 [Julia Base](@ref lib-arrays)。
 
@@ -341,7 +344,7 @@ julia> sum(A)
 | `strides(A)` |   | 返回每个维度中相邻元素之间的内存距离（以内存元素数量的形式）组成的元组。如果 `A` 是 `AbstractArray{T,0}`，这应该返回空元组。 |
 | `Base.unsafe_convert(::Type{Ptr{T}}, A)` |   | 返回数组的本地内存地址。 |
 | **可选方法** | **默认定义** | **简短描述** |
-| `stride(A, i::Int)` |   `strides(A)[i]` | 返回维度 i（译注：原文为 k）上相邻元素之间的内存距离（以内存元素数量的形式）。 |
+| `stride(A, i::Int)` | `strides(A)[i]` | 返回维度 i（译注：原文为 k）上相邻元素之间的内存距离（以内存元素数量的形式）。 |
 
 Strided 数组是 `AbstractArray` 的子类型，其条目以固定步长储存在内存中。如果数组的元素类型与 BLAS 兼容，则 strided 数组可以利用 BLAS 和 LAPACK 例程来实现更高效的线性代数例程。用户定义的 strided 数组的典型示例是把标准 `Array` 用附加结构进行封装的数组。
 
@@ -366,10 +369,10 @@ V = view(A, [1,2,4], :)   # is not strided, as the spacing between rows is not f
 | 需要实现的方法 | 简短描述 |
 |:-------------------- |:----------------- |
 | `Base.BroadcastStyle(::Type{SrcType}) = SrcStyle()` | `SrcType` 的广播行为 |
-| `Base.similar(bc::Broadcasted{DestStyle}, ::Type{ElType})` | 输出结果的分配 |
+| `Base.similar(bc::Broadcasted{DestStyle}, ::Type{ElType})` | 输出容器的分配 |
 | **可选方法** | | |
 | `Base.BroadcastStyle(::Style1, ::Style2) = Style12()` | 混合广播风格的优先级规则 |
-| `Base.broadcast_axes(x)` | 用于广播的 `x` 的索引的声明（默认为 [`axes(x)`](@ref)） |
+| `Base.axes(x)` | 用于广播的 `x` 的索引的声明（默认为 [`axes(x)`](@ref)） |
 | `Base.broadcastable(x)` | 将 `x` 转换为一个具有 `axes` 且支持索引的对象 |
 | **绕过默认机制** | |
 | `Base.copy(bc::Broadcasted{DestStyle})` | `broadcast` 的自定义实现 |
@@ -384,9 +387,9 @@ V = view(A, [1,2,4], :)   # is not strided, as the spacing between rows is not f
 * 为给定参数集选择合适的输出数组
 * 为给定参数集选择高效的实现
 
-不是所有类型都支持 `axes` 和索引，但许多类型便于支持广播。[`Base.broadcastable`](@ref) 函数会在每个广播参数上调用，它能返回与广播参数不同的支持 `axes` 和索引的对象。默认情况下，对于所有 `AbstractArray` 和 `Number` 来说这是 identity 函数——因为它们已经支持 `axes` 和索引了。少数其它类型（包括但不限于类型本身、函数、像 [`missing`](@ref) 和 [`nothing`](@ref) 这样的特殊单态类型以及日期）为了能被广播，`Base.broadcastable` 会返回封装在 `Ref` 的参数来充当 0 维「标量」。自定义类型可以类似地指定 `Base.broadcastable` 来定义其形状，但是它们应当遵循 `collect(Base.broadcastable(x)) == collect(x)` 的约定。一个值得注意的例外是 `AbstractString`；字符串是个特例，为了能被广播其表现为标量，尽管它们是其字符的可迭代集合（详见 [字符串](@ref)）。
+不是所有类型都支持 `axes` 和索引，但许多类型便于支持广播。[`Base.broadcastable`](@ref) 函数会在每个广播参数上调用，它能返回与广播参数不同的支持 `axes` 和索引的对象。默认情况下，对于所有 `AbstractArray` 和 `Number` 来说这是 identity 函数——因为它们已经支持 `axes` 和索引了。少数其它类型（包括但不限于类型本身、函数、像 [`missing`](@ref) 和 [`nothing`](@ref) 这样的特殊单态类型以及日期）为了能被广播，`Base.broadcastable` 会返回封装在 `Ref` 的参数来充当 0 维「标量」。自定义类型可以类似地指定 `Base.broadcastable` 来定义其形状，但是它们应当遵循 `collect(Base.broadcastable(x)) == collect(x)` 的约定。一个值得注意的例外是 `AbstractString`；字符串是个特例，为了能被广播其表现为标量，尽管它们是其字符的可迭代集合（详见 [字符串](@id man-strings)）。
 
-接下来的两个步骤（选择输出数组和实现）依赖于如何确定给定参数集的 single answer。广播必须接受其参数的所有不同类型，并把它们折叠到一个输出数组和实现。广播称此 single answer 为「风格」。每个可广播对象都有自己的首选风格，并使用类似于类型提升的系统将这些风格组合成 single answer——「目标风格」。
+接下来的两个步骤（选择输出数组和实现）依赖于如何确定给定参数集的唯一解。广播必须接受其参数的所有不同类型，并把它们折叠到一个输出数组和实现。广播称此唯一解为「风格」。每个可广播对象都有自己的首选风格，并使用类似于类型提升的系统将这些风格组合成一个唯一解——「目标风格」。
 
 ### 广播风格
 
@@ -403,11 +406,11 @@ Base.BroadcastStyle(::Type{<:MyType}) = MyStyle()
 
   - `Base.BroadcastStyle(::Type{<:MyType}) = Broadcast.Style{MyType}()` 可用于任意类型。
      
-  - 如果 `MyType` 是 `AbstractArray`，首选是 `Base.BroadcastStyle(::Type{<:MyType}) = Broadcast.ArrayStyle{MyType}()`。
+  - 如果 `MyType` 是一个 `AbstractArray`，首选是 `Base.BroadcastStyle(::Type{<:MyType}) = Broadcast.ArrayStyle{MyType}()`。
      
   - 对于只支持某个具体维度的 `AbstractArrays`，请创建 `Broadcast.AbstractArrayStyle{N}` 的子类型（请参阅下文）。
 
-当你的广播操作涉及多个参数，各个广播风格将合并以确定单个控制输出容器的类型的 `DestStyle`。有关更多详细信息，请参阅[下文](@ref writing-binary-broadcasting-rules)。
+当你的广播操作涉及多个参数，各个广播风格将合并，来确定唯一一个 `DestStyle` 以控制输出容器的类型。有关更多详细信息，请参阅[下文](@ref writing-binary-broadcasting-rules)。
 
 ### 选择合适的输出数组
 
@@ -462,10 +465,11 @@ end
 find_aac(bc::Base.Broadcast.Broadcasted) = find_aac(bc.args)
 find_aac(args::Tuple) = find_aac(find_aac(args[1]), Base.tail(args))
 find_aac(x) = x
+find_aac(::Tuple{}) = nothing
 find_aac(a::ArrayAndChar, rest) = a
 find_aac(::Any, rest) = find_aac(rest)
 # output
-find_aac (generic function with 5 methods)
+find_aac (generic function with 6 methods)
 ```
 
 在这些定义中，可以得到以下行为：

@@ -174,8 +174,8 @@ julia> g(2, 3.0)
 
 julia> g(2.0, 3.0)
 ERROR: MethodError: g(::Float64, ::Float64) is ambiguous. Candidates:
-  g(x, y::Float64) in Main at none:1
   g(x::Float64, y) in Main at none:1
+  g(x, y::Float64) in Main at none:1
 Possible fix, define
   g(::Float64, ::Float64)
 ```
@@ -196,7 +196,7 @@ julia> g(2.0, 3.0)
 10.0
 ```
 
-建议先定义没有歧义的方法，因为不这样的话，歧义就会存在，即使是暂时性的，知道更加专用的方法被定义。
+建议先定义没有歧义的方法，因为不这样的话，歧义就会存在，即使是暂时性的，直到更加专用的方法被定义。
 
 在更加复杂的情况下，解决方法歧义会会涉及到设计的某一个元素；这个主题将会在[下面](@ref man-method-design-ambiguities)进行进一步的探索。
 
@@ -234,7 +234,7 @@ julia> same_type(Int32(1), Int64(2))
 false
 ```
 
-这样的定义对应着那些类型签名是 `UnionAll` 类型的方法（参见[ UnionAll 类型](@ref)）。
+这样的定义对应着那些类型签名是 `UnionAll` 类型的方法（参见 [UnionAll 类型](@ref)）。
 
 在Julia中这种通过分派进行函数行为的定义是十分常见的，甚至是惯用的。方法类型参数并不局限于用作参数的类型：他们可以用在任意地方，只要值会在函数或者函数体的特征中。这里有个例子，例子中方法类型参数`T`用作方法特征中的参数类型`Vector{T}`的类型参数：
 
@@ -301,7 +301,7 @@ true
 julia> same_type_numeric("foo", 2.0)
 ERROR: MethodError: no method matching same_type_numeric(::String, ::Float64)
 Closest candidates are:
-  same_type_numeric(!Matched::T<:Number, ::T<:Number) where T<:Number at none:1
+  same_type_numeric(!Matched::T, ::T) where T<:Number at none:1
   same_type_numeric(!Matched::Number, ::Number) at none:1
 
 julia> same_type_numeric("foo", "bar")
@@ -313,7 +313,7 @@ false
 
 `same_type_numeric`函数的行为与上面定义的`same_type`函数基本相似，但是它只对一对数定义。
 
-参数方法允许与`where`表达式同样的语法用来写类型（参见[ UnionAll 类型](@ref)）。如果只有一个参数，封闭的大括号（在`where {T}`中）可以省略，但是为了清楚起见推荐写上。多个参数可以使用逗号隔开，例如`where {T, S <: Real}`，或者使用嵌套的`where`来写，例如`where S<:Real where T`。
+参数方法允许与 `where` 表达式同样的语法用来写类型（参见 [UnionAll 类型](@ref)）。如果只有一个参数，封闭的大括号（在 `where {T}` 中）可以省略，但是为了清楚起见推荐写上。多个参数可以使用逗号隔开，例如 `where {T, S <: Real}`，或者使用嵌套的 `where` 来写，例如 `where S<:Real where T`。
 
 重定义方法
 ------------------
@@ -341,13 +341,13 @@ julia> newfun()
 
 在这个例子中看到`newfun`的新定义已经被创建，但是并不能立即调用。新的全局变量立即对`tryeval`函数可见，所以你可以写`return newfun`（没有小括号）。但是你，你的调用器，和他们调用的函数等等都不能调用这个新的方法定义！
 
-但是这里有个例外：*来自REPL*的未来的`newfun`的调用会按照预期工作，能够见到并调用`newfun`。
+但是这里有个例外：之后的*在 REPL 中*的 `newfun` 的调用会按照预期工作，能够见到并调用`newfun` 的新定义。
 
-但是对于`tryeval`的未来的调用会继续能见到`newfun`的定义，就像它在*REPL中的前一个语句中*，在`tryeval`的调用之前一样。
+但是，之后的 `tryeval` 的调用将会继续看到 `newfun` 的定义，因为该定义*位于 REPL 的前一个语句中*并因此在之后的 `tryeval` 的调用之前。
 
 你可以试试这个来让自己了解这是如何工作的。
 
-这个行为的实现方法是一个"世界年龄计数器"。这个单调增加的值追踪每个方法定义运算。这允许把"对于给定的运行环境可见的方法定义集合"描述为一个数，或称为"世界年龄"。这也允许比较在两个世界中的可用的方法，仅仅通过依次比较他们的值。在上面的例子中，我们看到"当前世界"（方法`newfun`存在的世界）比当`tryeval`的执行开始时是固定的对任务是局部的"运行世界"大一。
+这个行为的实现通过一个「world age 计数器」。这个单调递增的值会跟踪每个方法定义操作。此计数器允许用单个数字描述「对于给定运行时环境可见的方法定义集」，或者说「world age」。它还允许仅仅通过其序数值来比较在两个 world 中可用的方法。在上例中，我们看到（方法 `newfun` 所存在的）「current world」比局部于任务的「runtime world」大一，后者在 `tryeval` 开始执行时是固定的。
 
 有时规避这个是必要的（例如，如果你在实现上面的REPL）。幸运的是这里有个简单地解决方法：使用[`Base.invokelatest`](@ref)调用函数：
 
@@ -422,7 +422,9 @@ julia> fetch(schedule(t, 1))
 abstract type AbstractArray{T, N} end
 eltype(::Type{<:AbstractArray{T}}) where {T} = T
 ```
-使用了所谓的三角分派。注意如果`T`是一个`UnionAll`类型，比如`eltype(Array{T} where T <: Integer)`，会返回`Any`（如同`Base`中的`eltype`一样）。
+using so-called triangular dispatch.  Note that if `T` is a `UnionAll`
+type, as e.g. `eltype(Array{T} where T <: Integer)`, then `Any` is
+returned (as does the version of `eltype` in `Base`).
 
 另外一个方法，这是在Julia v0.6中的三角分派到来之前的唯一正确方法，是：
 
@@ -556,7 +558,7 @@ function matmul(a::AbstractMatrix, b::AbstractMatrix)
     output = similar(b, R, (size(a, 1), size(b, 2)))
     if size(a, 2) > 0
         for j in 1:size(b, 2)
-            for i in 1:size(b, 1)
+            for i in 1:size(a, 1)
                 ## here we don't use `ab = zero(R)`,
                 ## since `R` might be `Any` and `zero(Any)` is not defined
                 ## we also must declare `ab::R` to make the type of `ab` constant in the loop,
@@ -682,7 +684,7 @@ julia> p()
 
 这个机制也是Julia中类型构造函数和闭包（指向其环境的内部函数）的工作原理。
 
-## 空范用函数
+## 空泛型函数
 
 有时引入一个没有添加方法的范用函数是有用的。这会用于分离实现与接口定义。这也可为了文档或者代码可读性。为了这个的语法是没有参数组的一个空`函数`块：
 
@@ -708,13 +710,13 @@ f(x::Int, y) = 2
 f(x::Int, y::Int) = 3
 ```
 
-这是经常使用的对的方案；但是有些环境下盲目地遵从这个建议会适得其反。特别地，范用函数有的方法越多，出现歧义的可能性越高。当你的方法层级比这下简单的例子更加复杂时，就值得你花时间去仔细想想其他的方案。
+这是经常使用的对的方案；但是有些环境下盲目地遵从这个建议会适得其反。特别地，范用函数有的方法越多，出现歧义的可能性越高。当你的方法层级比这些简单的例子更加复杂时，就值得你花时间去仔细想想其他的方案。
 
 下面我们会讨论特别的一些挑战和解决这些挑战的一些可选方法。
 
 ### 元组和N元组参数
 
-`元组`（和`N元组`）参数会带来特别的挑战。例如，
+`Tuple`（和`NTuple`）参数会带来特别的挑战。例如，
 
 ```julia
 f(x::NTuple{N,Int}) where {N} = 1
@@ -736,7 +738,7 @@ f(x::Tuple{Float64, Vararg{Float64}}) = 2   # this requires at least one Float64
 
 ### [正交化你的设计](@id man-methods-orthogonalize)
 
-当你禁不住要根据两个或更多的参数进行分派时，考虑一下是否一个"包裹"函数会让设计简单一些。举个例子，与其编写多变量：
+当你打算根据两个或更多的参数进行分派时，考虑一下，一个「包裹」函数是否会让设计简单一些。举个例子，与其编写多变量：
 
 ```julia
 f(x::A, y::A) = ...
@@ -765,7 +767,10 @@ f(x::T, y::T) where {T} = ...
 f(x, y) = f(promote(x, y)...)
 ```
 
-这个设计的一个隐患是如果没有合适的把`x`和`y`转换到同样类型的类型提升方法，第二个方法就可能无限自递归然后引发堆溢出。非输出函数`Base.promote_noncircular`可以用作一个替代方案；当类型提升失败它依旧会扔出一个错误，但是有更加特定的错误信息时会失败更快。
+One risk with this design is the possibility that if there is no
+suitable promotion method converting `x` and `y` to the same type, the
+second method will recurse on itself infinitely and trigger a stack
+overflow.
 
 ### 一次只根据一个参数分派
 
@@ -842,6 +847,6 @@ function myfilter(A, kernel, ::NoPad)
 end
 ```
 
-`NoPad`会被用到其他padding类型的同样的参数位置上，所以这保持了分派层级是有很好组织的，却降低了歧义的可能性。而且，它扩展了"公开"的`myfilter`接口：想要显式空值padding的用户可以直接调用`NoPad`变量。
+`NoPad` 被置于与其他 padding 类型一致的参数位置上，这保持了分派层级的良好组织，同时降低了歧义的可能性。而且，它扩展了「公开」的 `myfilter` 接口：想要显式控制 padding 的用户可以直接调用 `NoPad` 变量。
 
 [^Clarke61]: Arthur C. Clarke, *Profiles of the Future* (1961): Clarke's Third Law.

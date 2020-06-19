@@ -2,12 +2,12 @@
 
 与大多数技术计算语言一样，Julia 提供原生的数组实现。 大多数技术计算语言非常重视其数组实现，但需要付出使用其它容器的代价。Julia 用同样的方式来处理数组。就像和其它用 Julia 写的代码一样，Julia 的数组库几乎完全是用 Julia 自身实现的，它的性能源自编译器。这样一来，用户就可以通过继承 [`AbstractArray`](@ref) 的方式来创建自定义数组类型。 实现自定义数组类型的更多详细信息，请参阅[manual section on the AbstractArray interface](@ref man-interface-array)。
 
-数组是存储在多维网格中对象的集合。在最一般的情况下， 数组中的对象可能是 `Any` 类型。
+数组是存储在多维网格中对象的集合。在最一般的情况下， 数组中的对象可能是 [`Any`](@ref) 类型。
 对于大多数计算上的需求，数组中对象的类型应该更加具体，例如 [`Float64`](@ref) 或 [`Int32`](@ref)。
 
 一般来说，与许多其他科学计算语言不同，Julia 不希望为了性能而以向量化的方式编写程序。Julia 的编译器使用类型推断，并为标量数组索引生成优化的代码，从而能够令用户方便地编写可读性良好的程序，而不牺牲性能，并且时常会减少内存使用。
 
-在 Julia 中，所有函数的参数都是 [passed by sharing](https://en.wikipedia.org/wiki/Evaluation_strategy#Call_by_sharing)。一些科学计算语言用传值的方式传递数组，尽管这样做可以防止数组在被调函数中被意外地篡改，但这也会导致不必要的数组拷贝。通常，以一个 `!` 结尾的函数名表示它会对自己的一个或者多个参数的值进行修改或者销毁（例如，[`sort`](@ref) 和 [`sort!`](@ref)）。被调函数必须进行显式拷贝，以确保它们不会无意中修改输入参数。很多 “non-mutating” 函数在实现的时候，都会先进行显式拷贝，然后调用一个以 `!` 结尾的同名函数，最后返回之前拷贝的副本。
+在 Julia 中，所有函数的参数都是 [passed by sharing](https://en.wikipedia.org/wiki/Evaluation_strategy#Call_by_sharing)。一些科学计算语言用传值的方式传递数组，尽管这样做可以防止数组在被调函数中被意外地篡改，但这也会导致不必要的数组拷贝。通常，以一个 `!` 结尾的函数名表示它会对自己的一个或者多个参数的值进行修改或者销毁（例如，请比较 [`sort`](@ref) 和 [`sort!`](@ref)）。被调函数必须进行显式拷贝，以确保它们不会无意中修改输入参数。很多 “non-mutating” 函数在实现的时候，都会先进行显式拷贝，然后调用一个以 `!` 结尾的同名函数，最后返回之前拷贝的副本。
 
 ## 基本函数
 
@@ -18,8 +18,8 @@
 | [`ndims(A)`](@ref)     | `A` 的维数                                                  |
 | [`size(A)`](@ref)      | 一个包含 `A` 各个维度上元素数量的元组                                         |
 | [`size(A,n)`](@ref)    | `A` 第 `n` 维中的元素数量                                              |
-| [`axes(A)`](@ref)   | 一个包含 `A` 有效索引的元组                                      |
-| [`axes(A,n)`](@ref) | 第 `n` 维有效索引的范围                         |
+| [`axes(A)`](@ref)      | 一个包含 `A` 有效索引的元组                                      |
+| [`axes(A,n)`](@ref)    | 第 `n` 维有效索引的范围                         |
 | [`eachindex(A)`](@ref) | 一个访问 `A` 中每一个位置的高效迭代器                          |
 | [`stride(A,k)`](@ref)  | 在第 `k` 维上的间隔（stride）（相邻元素间的线性索引距离） |
 | [`strides(A)`](@ref)   | 包含每一维上的间隔（stride）的元组                                         |
@@ -42,86 +42,149 @@ Julia 提供了许多用于构造和初始化数组的函数。在下列函数�
 | [`reinterpret(T, A)`](@ref)                    | 与 `A` 具有相同二进制数据的数组，但元素类型为 `T`                                                                                                                                                                         |
 | [`rand(T, dims...)`](@ref)                     | 一个随机 `Array`，元素值是 ``[0, 1)`` 半开区间中的均匀分布且服从一阶独立同分布 [^1]                                                                                                                                       |
 | [`randn(T, dims...)`](@ref)                    | 一个随机 `Array`，元素为标准正态分布，服从独立同分布                                                                                                                                                                         |
-| [`Matrix{T}(I, m, n)`](@ref)                   | `m` 行 `n` 列的单位矩阵                                                                                                                                                                                                                   |
+| [`Matrix{T}(I, m, n)`](@ref)                   | `m`-by-`n` identity matrix (requires `using LinearAlgebra`)                                                                                                                                                                                                                   |
 | [`range(start, stop=stop, length=n)`](@ref)    | 从 `start` 到 `stop` 的带有 `n` 个线性间隔元素的范围                                                                                                                                                                                 |
 | [`fill!(A, x)`](@ref)                          | 用值 `x` 填充数组 `A`                                                                                                                                                                                                        |
 | [`fill(x, dims...)`](@ref)                     | 一个被值 `x` 填充的 `Array`                                                                                                                                                                                                         |
 
 [^1]: *iid*，独立同分布
 
-用 `[A，B，C，...]` 来构造 1 维数组（向量）。如果所有参数有一个共同的提升类型（[promotion type](@ref conversion-and-promotion)），那么它们会被 [`convert`](@ref) 函数转换为该类型。
-
-要查看各种方法，我们可以将不同维数传递给这些构造函数，请考虑以下示例：
+To see the various ways we can pass dimensions to these functions, consider the following examples:
 ```jldoctest
-julia> zeros(Int8, 2, 2)
-2×2 Array{Int8,2}:
- 0  0
- 0  0
+julia> zeros(Int8, 2, 3)
+2×3 Array{Int8,2}:
+ 0  0  0
+ 0  0  0
 
-julia> zeros(Int8, (2, 2))
-2×2 Array{Int8,2}:
- 0  0
- 0  0
+julia> zeros(Int8, (2, 3))
+2×3 Array{Int8,2}:
+ 0  0  0
+ 0  0  0
 
-julia> zeros((2, 2))
-2×2 Array{Float64,2}:
- 0.0  0.0
- 0.0  0.0
+julia> zeros((2, 3))
+2×3 Array{Float64,2}:
+ 0.0  0.0  0.0
+ 0.0  0.0  0.0
 ```
-这里的 `(2, 2)` 是一个 [`Tuple`](@ref).
+Here, `(2, 3)` is a [`Tuple`](@ref) and the first argument — the element type — is optional, defaulting to `Float64`.
 
-## 拼接
+## [Array literals](@id man-array-literals)
 
-可以使用以下函数构造和拼接数组：
+Arrays can also be directly constructed with square braces; the syntax `[A, B, C, ...]`
+creates a one dimensional array (i.e., a vector) containing the comma-separated arguments as
+its elements. The element type ([`eltype`](@ref)) of the resulting array is automatically
+determined by the types of the arguments inside the braces. If all the arguments are the
+same type, then that is its `eltype`. If they all have a common
+[promotion type](@ref conversion-and-promotion) then they get converted to that type using
+[`convert`](@ref) and that type is the array's `eltype`. Otherwise, a heterogeneous array
+that can hold anything — a `Vector{Any}` — is constructed; this includes the literal `[]`
+where no arguments are given.
 
-| 函数                    | 描述                                     |
-|:--------------------------- |:----------------------------------------------- |
-| [`cat(A...; dims=k)`](@ref) | 沿着 s 的第 `k` 维拼接数组 |
-| [`vcat(A...)`](@ref)        | `cat(A...; dims=1)` 的简写               |
-| [`hcat(A...)`](@ref)        | `cat(A...; dims=2)` 的简写               |
-
-传递给这些函数的标量值会被当作单元素数组。例如，
 ```jldoctest
-julia> vcat([1, 2], 3)
+julia> [1,2,3] # An array of `Int`s
 3-element Array{Int64,1}:
  1
  2
  3
 
-julia> hcat([1 2], 3)
+julia> promote(1, 2.3, 4//5) # This combination of Int, Float64 and Rational promotes to Float64
+(1.0, 2.3, 0.8)
+
+julia> [1, 2.3, 4//5] # Thus that's the element type of this Array
+3-element Array{Float64,1}:
+ 1.0
+ 2.3
+ 0.8
+
+julia> []
+0-element Array{Any,1}
+```
+
+### [Concatenation](@id man-array-concatenation)
+
+If the arguments inside the square brackets are separated by semicolons (`;`) or newlines
+instead of commas, then their contents are _vertically concatenated_ together instead of
+the arguments being used as elements themselves.
+
+```jldoctest
+julia> [1:2, 4:5] # Has a comma, so no concatenation occurs. The ranges are themselves the elements
+2-element Array{UnitRange{Int64},1}:
+ 1:2
+ 4:5
+
+julia> [1:2; 4:5]
+4-element Array{Int64,1}:
+ 1
+ 2
+ 4
+ 5
+
+julia> [1:2; 4:5]
+4-element Array{Int64,1}:
+ 1
+ 2
+ 4
+ 5
+
+julia> [1:2
+        4:5
+        6]
+5-element Array{Int64,1}:
+ 1
+ 2
+ 4
+ 5
+ 6
+```
+
+Similarly, if the arguments are separated by tabs or spaces, then their contents are
+_horizontally concatenated_ together.
+
+```jldoctest
+julia> [1:2  4:5  7:8]
+2×3 Array{Int64,2}:
+ 1  4  7
+ 2  5  8
+
+julia> [[1,2]  [4,5]  [7,8]]
+2×3 Array{Int64,2}:
+ 1  4  7
+ 2  5  8
+
+julia> [1 2 3] # Numbers can also be horizontally concatenated
 1×3 Array{Int64,2}:
  1  2  3
 ```
 
-这些拼接函数非常常用，因此它们有特殊的语法：
+Using semicolons (or newlines) and spaces (or tabs) can be combined to concatenate
+both horizontally and vertically at the same time.
 
-| 表达式        | 调用             |
-|:----------------- |:----------------- |
-| `[A; B; C; ...]`  | [`vcat`](@ref)  |
-| `[A B C ...]`     | [`hcat`](@ref)  |
-| `[A B; C D; ...]` | [`hvcat`](@ref) |
-
-[`hvcat`](@ref) 可以在第 1 维列数组（用分号分隔）和第 2 维行数组（用空格分隔）进行拼接。
-请考虑以下语法示例：
 ```jldoctest
-julia> [[1; 2]; [3, 4]]
-4-element Array{Int64,1}:
- 1
- 2
- 3
- 4
-
-julia> [[1 2] [3 4]]
-1×4 Array{Int64,2}:
- 1  2  3  4
-
-julia> [[1 2]; [3 4]]
+julia> [1 2
+        3 4]
 2×2 Array{Int64,2}:
  1  2
  3  4
+
+julia> [zeros(Int, 2, 2) [1; 2]
+        [3 4]            5]
+3×3 Array{Int64,2}:
+ 0  0  1
+ 0  0  2
+ 3  4  5
 ```
 
-## 限定类型数组的初始化
+More generally, concatenation can be accomplished through the [`cat`](@ref) function.
+These syntaxes are shorthands for function calls that themselves are convenience functions:
+
+| 语法            | 函数        | 描述                                        |
+|:----------------- |:--------------- |:-------------------------------------------------- |
+|                   | [`cat`](@ref)   | 沿着 s 的第 `k` 维拼接数组    |
+| `[A; B; C; ...]`  | [`vcat`](@ref)  | shorthand for `cat(A...; dims=1)                   |
+| `[A B C ...]`     | [`hcat`](@ref)  | shorthand for `cat(A...; dims=2)                   |
+| `[A B; C D; ...]` | [`hvcat`](@ref) | simultaneous vertical and horizontal concatenation |
+
+### Typed array literals
 
 可以用 `T[A, B, C, ...]` 的方式声明一个元素为某种特定类型的数组。该方法定义一个元素类型为 `T` 的一维数组并且初始化元素为 `A`, `B`, `C`, ....。比如，`Any[x, y, z]` 会构建一个异构数组，该数组可以包含任意类型的元素。
 
@@ -137,7 +200,7 @@ julia> Int8[[1 2] [3 4]]
  1  2  3  4
 ```
 
-## （数组）推导
+## [Comprehensions](@id man-comprehensions)
 
 （数组）推导提供了构造数组的通用且强大的方法。其语法类似于数学中的集合构造的写法：
 
@@ -145,7 +208,7 @@ julia> Int8[[1 2] [3 4]]
 A = [ F(x,y,...) for x=rx, y=ry, ... ]
 ```
 
-这种形式的含义是 `F(x,y,...)` 取其给定列表中变量 `x`，`y` 等的每个值进行计算。值可以指定为任何可迭代对象，但通常是 `1:n` 或 `2:(n-1)` 之类的范围，或者像 `[1.2, 3.4, 5.7]` 这样的显式数组值。结果是一个 N 维密集数组，其维数是变量范围 `rx`，`ry` 等的维数串联。每次 `FF(x,y,...)` 计算返回一个标量。
+这种形式的含义是 `F(x,y,...)` 取其给定列表中变量 `x`，`y` 等的每个值进行计算。值可以指定为任何可迭代对象，但通常是 `1:n` 或 `2:(n-1)` 之类的范围，或者像 `[1.2, 3.4, 5.7]` 这样的显式数组值。结果是一个 N 维密集数组，其维数是变量范围 `rx`，`ry` 等的维数串联。每次 `F(x,y,...)` 计算返回一个标量。
 
 下面的示例计算当前元素和沿一维网格其左，右相邻元素的加权平均值：
 
@@ -171,7 +234,9 @@ julia> [ 0.25*x[i-1] + 0.5*x[i] + 0.25*x[i+1] for i=2:length(x)-1 ]
  0.656511
 ```
 
-生成的数组类型取决于参与计算元素的类型。为了明确地控制类型，可以在（数组）推导之前添加类型。例如，我们可以要求结果为单精度类型：
+The resulting array type depends on the types of the computed elements just like [array literals](@ref man-array-literals) do. In order to control the
+type explicitly, a type can be prepended to the comprehension. For example, we could have requested
+the result in single precision by writing:
 
 ```julia
 Float32[ 0.25*x[i-1] + 0.5*x[i] + 0.25*x[i+1] for i=2:length(x)-1 ]
@@ -202,7 +267,12 @@ julia> map(tuple, (1/(i+j) for i=1:2, j=1:2), [1 3; 2 4])
  (0.333333, 2)  (0.25, 4)
 ```
 
-生成器是通过内部函数实现。 与语言中内部函数的其他情况一样，封闭作用域中的变量可以在内部函数中“捕获”。 例如，`sum(p[i] - q[i] for i=1:n)` 从封闭作用域中捕获三个变量 `p`，`q` 和 `n`。捕获的变量可能会出现[性能提示](@ref man-performance-tips)中描述的性能问题。
+Generators are implemented via inner functions. Just like
+inner functions used elsewhere in the language, variables from the enclosing scope can be
+"captured" in the inner function.  For example, `sum(p[i] - q[i] for i=1:n)`
+captures the three variables `p`, `q` and `n` from the enclosing scope.
+Captured variables can present performance challenges; see
+[performance tips](@ref man-performance-captured).
 
 
 通过编写多个 `for` 关键字，生成器和推导中的范围可以取决于之前的范围：
@@ -231,7 +301,7 @@ julia> [(i,j) for i=1:3 for j=1:i if i+j == 4]
 
 ## [索引](@id man-array-indexing)
 
-索引 n 维数组 A 的一般语法是：
+索引 n 维数组 `A` 的一般语法是：
 
 ```
 X = A[I_1, I_2, ..., I_n]
@@ -241,9 +311,9 @@ X = A[I_1, I_2, ..., I_n]
 
 如果所有索引都是标量，则结果 `X` 是数组 `A` 中的单个元素。否则，`X` 是一个数组，其维数与所有索引的维数之和相同。
 
-如果所有索引都是向量，则 `X` 的形状将是 `(length(I_1), length(I_2), ..., length(I_n))`，其中，`X` 中位于 `(i_1, i_2, ..., i_n)` 处的元素为 `A[I_1[i_1], I_2[i_2], ..., I_n[i_n]]`。
+如果所有索引 `I_k` 都是向量，则 `X` 的形状将是 `(length(I_1), length(I_2), ..., length(I_n))`，其中，`X` 中位于 `i_1, i_2, ..., i_n` 处的元素为 `A[I_1[i_1], I_2[i_2], ..., I_n[i_n]]`。
 
-例子：
+例如：
 
 ```jldoctest
 julia> A = reshape(collect(1:16), (2, 2, 2, 2))
@@ -308,7 +378,7 @@ julia> A[[1 2; 1 2], 1, 2, 1]
  5  6
 ```
 
-位于 `(i_1, i_2, i_3, ..., i_{n+1})` 处的元素值是 `A[I_1[i_1, i_2], I_2[i_3], ..., I_n[i_{n+1}]]`。所有使用标量索引的维度都将被丢弃，例如，`A[2，I，3]` 的结果是一个大小为 `size(I)` 的数组，它的第 i 个元素由 `A[2, I[i], 3]` 填充。
+位于 `i_1, i_2, i_3, ..., i_{n+1}` 处的元素值是 `A[I_1[i_1, i_2], I_2[i_3], ..., I_n[i_{n+1}]]`。所有使用标量索引的维度都将被丢弃，例如，假设 `J` 是索引数组，那么 `A[2，J，3]` 的结果是一个大小为 `size(J)` 的数组、其第 j 个元素由 `A[2, J[j], 3]` 填充。
 
 作为此语法的特殊部分，`end` 关键字可用于表示索引括号内每个维度的最后一个索引，由索引的最内层数组的大小决定。没有 `end` 关键字的索引语法相当于调用[`getindex`](@ref)：
 
@@ -337,28 +407,27 @@ julia> x[1, [2 3; 4 1]]
  13  1
 ```
 
-形式为 `n:n-1` 的空范围有时用于表示 `n-1` 和 `n` 之间的索引间位置。例如，[`searchsorted`](@ref) 函数利用这个惯例来表示一个值的插入位置在有序数组中未找到：
+## [Indexed Assignment](@id man-indexed-assignment)
 
-```jldoctest
-julia> a = [1,2,5,6,7];
-
-julia> searchsorted(a, 3)
-3:2
-```
-
-## 赋值
-
-在 n 维数组 A 中赋值的一般语法是：
+在 n 维数组 `A` 中赋值的一般语法是：
 
 ```
 A[I_1, I_2, ..., I_n] = X
 ```
 
-其中每个`I_k`可以是标量整数，整数数组或任何其他[支持的索引类型](@ref man-supported-index-types)。 这包括[`Colon`](@ref) (`:`)来选择整个维度中的所有索引，形式为`a:c`或`a:b:c`的范围来选择连续或跨步的部分元素，以及布尔数组以`true`索引选择元素。
+其中每个 `I_k` 可以是标量整数，整数数组或任何其他[支持的索引类型](@ref man-supported-index-types)。这包括 [`Colon`](@ref) (`:`) 来选择整个维度中的所有索引，形式为 `a:c` 或 `a:b:c` 的范围来选择连续或跨步的子区间，以及布尔数组以选择索引为 `true` 的元素。
 
-如果`X`是一个数组，它必须具有与索引长度的乘积相同的元素数：`prod(length(I_1), length(I_2), ..., length(I_n))`。 `A`在位置`I_1[i_1], I_2[i_2], ..., I_n[i_n]`中的值被值`X[i_1, i_2, ..., i_n]`覆盖。 如果`X`不是数组，则将其值写入`A`中所有引用的位置。
+如果所有 `I_k` 都为整数，则数组 `A` 中 `I_1, I_2, ..., I_n` 位置的值将被 `X` 的值覆盖，必要时将 [`convert`](@ref) 为数组 `A` 的 [`eltype`](@ref)。
 
-就像在[索引](@ref man-array-indexing)中一样，`end`关键字可用于表示索引括号中每个维度的最后一个索引，由被赋值的数组大小决定。 没有`end`关键字的索引赋值语法相当于调用[`setindex！`](@ref)：
+
+如果任一 `I_k` 选择了一个以上的位置，则等号右侧的 `X` 必须为一个与 `A[I_1, I_2, ..., I_n]` 形状一致的数组或一个具有相同元素数的向量。数组 `A` 中 `I_1[i_1], I_2[i_2], ..., I_n[i_n]` 位置的值将被 `X[I_1, I_2, ..., I_n]` 的值覆盖，必要时会转换类型。逐元素的赋值运算符 `.=` 可以用于将 `X` 沿选择的位置 [broadcast](@ref 广播)：
+
+
+```
+A[I_1, I_2, ..., I_n] .= X
+```
+
+就像在[索引](@ref man-array-indexing)中一样，`end`关键字可用于表示索引括号中每个维度的最后一个索引，由被赋值的数组大小决定。 没有`end`关键字的索引赋值语法相当于调用[`setindex!`](@ref)：
 
 ```
 setindex!(A, X, I_1, I_2, ..., I_n)
@@ -390,7 +459,7 @@ julia> x
 
 1. 标量索引。默认情况下，这包括：
     * 非布尔的整数
-    * [[`CartesianIndex {N}`](@ref)s，其行为类似于跨越多个维度的 `N` 维整数元组（详见下文）
+    * [`CartesianIndex{N}`](@ref)s，其行为类似于跨越多个维度的 `N` 维整数元组（详见下文）
 2. 标量索引数组。这包括：
     * 整数向量和多维整数数组
     * 像 `[]` 这样的空数组，它不选择任何元素
@@ -459,9 +528,9 @@ julia> A[CartesianIndex(3, 2, 1)] == A[3, 2, 1] == 7
 true
 ```
 
-如果单独考虑，这可能看起来相对微不足道; `CartesianIndex` 只是将多个整数聚合成一个表示单个多维索引的对象。 但是，当与其他索引形式和迭代器组合产生多个 `CartesianIndex` 时，这可以直接形成非常优雅和高效的代码。请参阅下面的[迭代](@ref)，有关更高级的示例，请参阅[关于多维算法和迭代博客文章](https://julialang.org/blog/2016/02/iteration)。
+如果单独考虑，这可能看起来相对微不足道；`CartesianIndex` 只是将多个整数聚合成一个表示单个多维索引的对象。 但是，当与其他索引形式和迭代器组合产生多个 `CartesianIndex` 时，这可以生成非常优雅和高效的代码。请参阅下面的[迭代](@ref)，有关更高级的示例，请参阅[关于多维算法和迭代博客文章](https://julialang.org/blog/2016/02/iteration)。
 
-也支持 `CartesianIndex {N}` 的数组。 它们代表一组标量索引，每个索引都跨越 `N` 个维度，从而实现一种有时也称为逐点索引的索引形式。例如，它可以从上面的 `A` 的第一“页”访问对角元素：
+也支持 `CartesianIndex {N}` 的数组。它们代表一组标量索引，每个索引都跨越 `N` 个维度，从而实现一种有时也称为逐点索引的索引形式。例如，它可以从上面的 `A` 的第一「页」访问对角元素：
 
 ```jldoctest cartesianindex
 julia> page = A[:,:,1]
@@ -502,11 +571,22 @@ julia> A[CartesianIndex.(axes(A, 1), axes(A, 2)), :]
 
 !!! warning
 
-    `CartesianIndex` 和 `CartesianIndex` 数组与表示维度的最后一个索引的 `end` 关键字不兼容。 不要在可能包含 `CartesianIndex` 或其数组的索引表达式中使用 `end`。
+    `CartesianIndex` and arrays of `CartesianIndex` are not compatible with the
+    `end` keyword to represent the last index of a dimension. Do not use `end`
+    in indexing expressions that may contain either `CartesianIndex` or arrays thereof.
 
-### 逻辑索引
+### Logical indexing
 
-通常称为逻辑索引或使用逻辑掩码索引，通过布尔数组进行索引选择索引处其值为 `true` 的元素。 通过布尔向量 `B` 进行索引实际上与通过[`findall(B)`](@ref)返回的整数向量进行索引相同。 类似地，通过 `N` 维布尔数组进行索引实际上与通过 `CartesianIndex{N}` 向量在值为 `true` 处进行索引相同。 逻辑索引必须是与其索引的维度长度相同的向量，或者它必须是提供的唯一索引，并且与索引的数组的大小和维度相匹配。 将布尔数组直接用作索引，通常比首先调用[`findall`](@ref)更有效。
+Often referred to as logical indexing or indexing with a logical mask, indexing
+by a boolean array selects elements at the indices where its values are `true`.
+Indexing by a boolean vector `B` is effectively the same as indexing by the
+vector of integers that is returned by [`findall(B)`](@ref). Similarly, indexing
+by a `N`-dimensional boolean array is effectively the same as indexing by the
+vector of `CartesianIndex{N}`s where its values are `true`. A logical index
+must be a vector of the same length as the dimension it indexes into, or it
+must be the only index provided and match the size and dimensionality of the
+array it indexes into. It is generally more efficient to use boolean arrays as
+indices directly instead of first calling [`findall`](@ref).
 
 ```jldoctest
 julia> x = reshape(1:16, 4, 4)
@@ -523,10 +603,10 @@ julia> x[[false, true, true, false], :]
 
 julia> mask = map(ispow2, x)
 4×4 Array{Bool,2}:
-  true  false  false  false
-  true  false  false  false
- false  false  false  false
-  true   true  false   true
+ 1  0  0  0
+ 1  0  0  0
+ 0  0  0  0
+ 1  1  0  1
 
 julia> x[mask]
 5-element Array{Int64,1}:
@@ -535,6 +615,119 @@ julia> x[mask]
   4
   8
  16
+```
+
+### Number of indices
+
+#### Cartesian indexing
+
+The ordinary way to index into an `N`-dimensional array is to use exactly `N` indices; each
+index selects the position(s) in its particular dimension. For example, in the three-dimensional
+array `A = rand(4, 3, 2)`, `A[2, 3, 1]` will select the number in the second row of the third
+column in the first "page" of the array. This is often referred to as _cartesian indexing_.
+
+#### Linear indexing
+
+When exactly one index `i` is provided, that index no longer represents a location in a
+particular dimension of the array. Instead, it selects the `i`th element using the
+column-major iteration order that linearly spans the entire array. This is known as _linear
+indexing_. It essentially treats the array as though it had been reshaped into a
+one-dimensional vector with [`vec`](@ref).
+
+```jldoctest linindexing
+julia> A = [2 6; 4 7; 3 1]
+3×2 Array{Int64,2}:
+ 2  6
+ 4  7
+ 3  1
+
+julia> A[5]
+7
+
+julia> vec(A)[5]
+7
+```
+
+A linear index into the array `A` can be converted to a `CartesianIndex` for cartesian
+indexing with `CartesianIndices(A)[i]` (see [`CartesianIndices`](@ref)), and a set of
+`N` cartesian indices can be converted to a linear index with
+`LinearIndices(A)[i_1, i_2, ..., i_N]` (see [`LinearIndices`](@ref)).
+
+```jldoctest linindexing
+julia> CartesianIndices(A)[5]
+CartesianIndex(2, 2)
+
+julia> LinearIndices(A)[2, 2]
+5
+```
+
+It's important to note that there's a very large assymmetry in the performance
+of these conversions. Converting a linear index to a set of cartesian indices
+requires dividing and taking the remainder, whereas going the other way is just
+multiplies and adds. In modern processors, integer division can be 10-50 times
+slower than multiplication. While some arrays — like [`Array`](@ref) itself —
+are implemented using a linear chunk of memory and directly use a linear index
+in their implementations, other arrays — like [`Diagonal`](@ref) — need the
+full set of cartesian indices to do their lookup (see [`IndexStyle`](@ref) to
+introspect which is which). As such, when iterating over an entire array, it's
+much better to iterate over [`eachindex(A)`](@ref) instead of `1:length(A)`.
+Not only will the former be much faster in cases where `A` is `IndexCartesian`,
+but it will also support OffsetArrays, too.
+
+#### Omitted and extra indices
+
+In addition to linear indexing, an `N`-dimensional array may be indexed with
+fewer or more than `N` indices in certain situations.
+
+Indices may be omitted if the trailing dimensions that are not indexed into are
+all length one. In other words, trailing indices can be omitted only if there
+is only one possible value that those omitted indices could be for an in-bounds
+indexing expression. For example, a four-dimensional array with size `(3, 4, 2,
+1)` may be indexed with only three indices as the dimension that gets skipped
+(the fourth dimension) has length one. Note that linear indexing takes
+precedence over this rule.
+
+```jldoctest
+julia> A = reshape(1:24, 3, 4, 2, 1)
+3×4×2×1 reshape(::UnitRange{Int64}, 3, 4, 2, 1) with eltype Int64:
+[:, :, 1, 1] =
+ 1  4  7  10
+ 2  5  8  11
+ 3  6  9  12
+
+[:, :, 2, 1] =
+ 13  16  19  22
+ 14  17  20  23
+ 15  18  21  24
+
+julia> A[1, 3, 2] # Omits the fourth dimension (length 1)
+19
+
+julia> A[1, 3] # Attempts to omit dimensions 3 & 4 (lengths 2 and 1)
+ERROR: BoundsError: attempt to access 3×4×2×1 reshape(::UnitRange{Int64}, 3, 4, 2, 1) with eltype Int64 at index [1, 3]
+
+julia> A[19] # Linear indexing
+19
+```
+
+When omitting _all_ indices with `A[]`, this semantic provides a simple idiom
+to retrieve the only element in an array and simultaneously ensure that there
+was only one element.
+
+Similarly, more than `N` indices may be provided if all the indices beyond the
+dimensionality of the array are `1` (or more generally are the first and only
+element of `axes(A, d)` where `d` is that particular dimension number). This
+allows vectors to be indexed like one-column matrices, for example:
+
+```jldoctest
+julia> A = [8,6,7]
+3-element Array{Int64,1}:
+ 8
+ 6
+ 7
+
+julia> A[2,1]
+6
 ```
 
 ## 迭代
@@ -589,9 +782,7 @@ Base.IndexStyle(::Type{<:MyArray}) = IndexLinear()
 2. 二元运算符 -- `-`, `+`, `*`, `/`, `\`, `^`
 3. 比较操作符 -- `==`, `!=`, `≈` ([`isapprox`](@ref)), `≉`
 
-当一个参数是标量时，上面列出的大多数二元算术运算符也可以按元素运行：当任一参数是标量时，`-`，`+` 和 `*`；当分母是标量时，`/` 和 `\`。例如，`[1, 2] + 3 == [4, 5]` 和 `[6, 4] / 2 == [3, 2]`。
-
-另外，为了便于数学上和其他运算的向量化，Julia [提供了点语法（dot syntax）](@ref man-vectorized) `f.(args...)`，例如，`sin.(x)` 或 `min.(x,y)`，用于数组或数组和标量的混合上的按元素运算（[Broadcasting](@ref)运算）; 当与其他点调用（dot call）结合使用时，它们的额外优点是能“融合”到单个循环中，例如，`sin.(cos.(x))`。
+另外，为了便于数学上和其他运算的向量化，Julia [提供了点语法（dot syntax）](@ref man-vectorized) `f.(args...)`，例如，`sin.(x)` 或 `min.(x,y)`，用于数组或数组和标量的混合上的按元素运算（[广播](@ref)运算）；当与其他点调用（dot call）结合使用时，它们的额外优点是能「融合」到单个循环中，例如，`sin.(cos.(x))`。
 
 此外，*每个*二元运算符支持相应的[点操作版本](@ref man-dot-operators)，可以应用于此类[融合 broadcasting 操作](@ref man-vectorized)的数组（以及数组和标量的组合），例如 `z .== sin.(x .* y)`。
 
@@ -630,9 +821,13 @@ julia> broadcast(+, a, b)
  1.73659  0.873631
 ```
 
-类似 `.+` 和 `.*` 的[点运算符](@ref man-dot-operators) 等同于 `broadcast` 调用（除了它们融合两种操作，如下所述）。还有一个 [`broadcast!`](@ref) 函数来指定一个显式目标（也可以通过 `.=` 赋值以融合的方式访问它）。而且，`f.(args...)` 等价于 `broadcast(f, args...)`，为广播任何函数提供了方便的语法（[dot syntax](@ref man-vectorized)）。嵌套的“点调用”`f.(...)`（包括调用 `.+` 等）[自动融合](@ref man-dot-operators)到一个 `broadcast` 调用。
+类似 `.+` 和 `.*` 的[点运算符](@ref man-dot-operators) 等同于 `broadcast` 调用（除了它们融合两种操作，如下所述）。还有一个 [`broadcast!`](@ref) 函数来指定一个显式目标（也可以通过 `.=` 赋值以融合的方式访问它）。事实上，`f.(args...)` 等价于 `broadcast(f, args...)`，并为广播任何函数提供了方便的语法（[dot syntax](@ref man-vectorized)）。嵌套的「点调用」`f.(...)`（包括调用 `.+` 等）[自动融合](@ref man-dot-operators)到单个 `broadcast` 调用。
 
-另外，[`broadcast`](@ref) 并不局限于数组（参见函数文档），对于元组依然有效。对于其他非数组，元组或引用 [`Ref`](@ref)(除了指针 [`Ptr`](@ref)) 的参数，视作“标量”。
+Additionally, [`broadcast`](@ref) is not limited to arrays (see the function documentation);
+it also handles scalars, tuples and other collections.  By default, only some argument types are
+considered scalars, including (but not limited to) `Number`s, `String`s, `Symbol`s, `Type`s, `Function`s
+and some common singletons like `missing` and `nothing`. All other arguments are
+iterated over or indexed into elementwise.
 
 ```jldoctest
 julia> convert.(Float32, [1, 2])
@@ -654,17 +849,23 @@ julia> string.(1:3, ". ", ["First", "Second", "Third"])
 
 ## 实现
 
-Julia 中的基本数组类型是抽象类型 [`AbstractArray{T,N}`](@ref)。它通过维数 `N` 和元素类型 `T` 进行参数化。[`AbstractVector`](@ref) 和 [`AbstractMatrix`](@ref) 是一维和二维情况下的别名。`AbstractArray` 对象的操作是使用更高级别的运算符和函数定义的，其方式独立于底层存储。 这些操作通常能以任何特定数组实现的备选来正常工作。
+Julia 中的基本数组类型是抽象类型 [`AbstractArray{T,N}`](@ref)。它通过维数 `N` 和元素类型 `T` 进行参数化。[`AbstractVector`](@ref) 和 [`AbstractMatrix`](@ref) 是一维和二维情况下的别名。`AbstractArray` 对象的操作是使用更高级别的运算符和函数定义的，其方式独立于底层存储。这些操作可以正确地被用于任何特定数组实现的回退操作。
 
-`AbstractArray` 类型包含任何模糊类似的东西，它的实现可能与传统数组完全不同。例如，可以根据请求而不是存储来计算元素。但是，任何具体的 `AbstractArray{T,N}` 类型通常应该至少实现 [`size(A)`](@ref)（返回 `Int` 元组），[`getindex(A,i)`](@ref) 和 [`getindex(A,i1,...,iN)`](@ref getindex)；可变数组也应该实现 [`setindex!`](@ref)。建议这些操作具有几乎恒定的时间复杂度，或严格说来 Õ(1) 复杂性，否则某些数组函数可能出乎意料的慢。具体类型通常还应提供 [`similar(A,T=eltype(A),dims=size(A))`](@ref) 方法，用于为 [`copy`](@ref) 分配类似的数组和其他不正常的操作。无论在内部如何表示 `AbstractArray{T,N}`，`T` 是由 *整数* 索引返回的对象类型（`A[1, ..., 1]`，当 `A` 不为空），`N` 应该是 [`size`](@ref) 返回的元组的长度。有关定义自定义 `AbstractArray` 实现的更多详细信息，请参阅[接口章节中的数组接口导则](@ref man-interface-array)。
+`AbstractArray` 类型包含任何模糊类似的东西，它的实现可能与传统数组完全不同。例如，可以根据请求而不是存储来计算元素。但是，任何具体的 `AbstractArray{T,N}` 类型通常应该至少实现 [`size(A)`](@ref)（返回 `Int` 元组），[`getindex(A,i)`](@ref) 和 [`getindex(A,i1,...,iN)`](@ref getindex)；可变数组也应该实现 [`setindex!`](@ref)。建议这些操作具有几乎为常数的时间复杂性，或严格说来 Õ(1) 复杂性，否则某些数组函数可能出乎意料的慢。具体类型通常还应提供 [`similar(A,T=eltype(A),dims=size(A))`](@ref) 方法，用于为 [`copy`](@ref) 分配类似的数组和其他位于当前数组空间外的操作。无论在内部如何表示 `AbstractArray{T,N}`，`T` 是由 *整数* 索引返回的对象类型（`A[1, ..., 1]`，当 `A` 不为空），`N` 应该是 [`size`](@ref) 返回的元组的长度。有关定义自定义 `AbstractArray` 实现的更多详细信息，请参阅[接口章节中的数组接口导则](@ref man-interface-array)。
 
-`DenseArray` 是 `AbstractArray` 的抽象子类型，旨在包含元素按列连续存储的所有数组（请参阅[性能建议](@ref man-performance-tips)中的附加说明）。[`Array`](@ref) 类型是 `DenseArray` 的特定实例，[`Vector`](@ref) 和 [`Matrix`](@ref) 是在一维和二维情况下的别名。除了所有 `AbstractArray` 所需的操作之外，很少有专门为 `Array` 实现的操作；大多数数组库都以通用方式实现，以保证所有自定义数组都具有相似功能。
+`DenseArray` is an abstract subtype of `AbstractArray` intended to include all arrays where
+elements are stored contiguously in column-major order (see [additional notes in
+Performance Tips](@ref man-performance-column-major)). The [`Array`](@ref) type is a specific instance
+of `DenseArray`;  [`Vector`](@ref) and [`Matrix`](@ref) are aliases for the 1-d and 2-d cases.
+Very few operations are implemented specifically for `Array` beyond those that are required
+for all `AbstractArray`s; much of the array library is implemented in a generic
+manner that allows all custom arrays to behave similarly.
 
 `SubArray` 是 `AbstractArray` 的特例，它通过与原始数组共享内存而不是复制它来执行索引。 使用[`view`](@ref) 函数创建 `SubArray`，它的调用方式与[`getindex`](@ref) 相同（作用于数组和一系列索引参数）。 [`view`](@ref) 的结果看起来与 [`getindex`](@ref) 的结果相同，只是数据保持不变。 [`view`](@ref) 将输入索引向量存储在 `SubArray` 对象中，该对象稍后可用于间接索引原始数组。 通过将  [`@views`](@ref) 宏放在表达式或代码块之前，该表达式中的任何 `array [...]` 切片将被转换为创建一个 `SubArray` 视图。
 
 [`BitArray`](@ref) 是节省空间“压缩”的布尔数组，每个比特（bit）存储一个布尔值。 它们可以类似于 `Array{Bool}` 数组（每个字节（byte）存储一个布尔值），并且可以分别通过 `Array(bitarray)` 和 `BitArray(array)` 相互转换。
 
-“strided”数组存储在内存中，元素以常规偏移量排列，因此有 `isbits` 元素类型的实例可以被传递给期望此内存布局的外部C和Fortran函数。Strided arrays 必须定义一个 [`strides(A)`](@ref) 方法，该方法为每个维返回一个“strides”元组；提供 [`stride(A,k)`](@ref) 方法访问该元组中的第 k 个元素。将维数 `k` 的索引增加 `1` 应该把 [`getindex(A,i)`](@ref) 得到的索引 `i` 增加[`stride(A,k)`](@ref)。如果提供了指针转换方法[`Base.unsafe_convert(Ptr{T}, A)`](@ref)，则内存布局必须以与这些间隔相同的方式对应。 `DenseArray` 是一个非常具体的 strided 数组示例，其中元素是连续排列的，因此它为子类提供了适当的 “strides” 定义。更多具体的例子可以在[strided arrays的接口指南](@ref man-interface-strided-arrays) 中找到。 [`StridedVector`](@ref) 和 [`StridedMatrix`](@ref) 是许多算是 strided arrays 的内置数组类型的便捷别名，允许它们只使用指针和stride派发，选择调用专业实现的，高度调试和优化的 BLAS 和 LAPACK 函数。
+「strided」数组存储在内存中，元素以常规偏移量排列，因此元素类型兼容 `isbits` 的实例可以被传递给期望此内存布局的外部 C 和 Fortran 函数。Strided 数组必须定义一个 [`strides(A)`](@ref) 方法，该方法为每个维返回一个「strides」元组；提供 [`stride(A,k)`](@ref) 方法访问该元组中的第 `k` 个元素。将维数 `k` 的索引增加 `1` 应该把 [`getindex(A,i)`](@ref) 得到的索引 `i` 增加 [`stride(A,k)`](@ref)。如果提供了指针转换方法 [`Base.unsafe_convert(Ptr{T}, A)`](@ref)，则内存布局必须以与这些间隔相同的方式对应。`DenseArray` 是一个非常具体的 strided 数组示例，其中元素是连续排列的，因此它为子类提供了适当的 `strides` 定义。更多具体的例子可以在 [strided 数组的接口指南](@ref man-interface-strided-arrays)中找到。[`StridedVector`](@ref) 和 [`StridedMatrix`](@ref) 是许多算是 strided 数组的内置数组类型的便捷别名，允许它们只使用指针和 stride 派发来选择调用专门实现，即使用经高度调试和优化的 BLAS 和 LAPACK 函数。
 
 接下来的例子计算一个大数组中一小部分的 QR 分解，不需要引入任何临时变量。通过正确的维度大小和偏移参数调用合适的 LAPACK 函数。
 

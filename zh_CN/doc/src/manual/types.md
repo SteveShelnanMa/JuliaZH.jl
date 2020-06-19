@@ -83,7 +83,7 @@ end
 
 此函数的返回值就像赋值给了一个类型已被声明的变量：返回值始终转换为`Float64`。
 
-## 抽象类型
+## [Abstract Types](@id man-abstract-types)
 
 抽象类型不能实例化，只能作为类型图中的节点使用，从而描述由相关具体类型组成的集合：那些作为其后代的具体类型。我们从抽象类型开始，即使它们没有实例，因为它们是类型系统的主干：它们形成了概念的层次结构，这使得 Julia 的类型系统不只是对象实现的集合。
 
@@ -145,7 +145,10 @@ end
 
 因此，抽象类型允许程序员编写泛型函数，之后可以通过许多具体类型的组合将其用作默认方法。多亏了多重分派，程序员可以完全控制是使用默认方法还是更具体的方法。
 
-需要注意的重点是，即使程序员依赖参数为抽象类型的函数，性能也不会有任何损失，因为它会针对每个调用它的参数元组的具体类型重新编译。（但在函数参数是抽象类型的容器的情况下，可能存在性能问题；请参阅[性能建议](@ref man-performance-tips)。）
+An important point to note is that there is no loss in performance if the programmer relies on
+a function whose arguments are abstract types, because it is recompiled for each tuple of argument
+concrete types with which it is invoked. (There may be a performance issue, however, in the case
+of function arguments that are containers of abstract types; see [Performance Tips](@ref man-performance-abstract-container).)
 
 ## 原始类型
 
@@ -216,7 +219,7 @@ Foo
 
 ```jldoctest footype
 julia> Foo((), 23.5, 1)
-ERROR: InexactError: Int64(Int64, 23.5)
+ERROR: InexactError: Int64(23.5)
 Stacktrace:
 [...]
 ```
@@ -243,7 +246,7 @@ julia> foo.qux
 
 使用 `struct` 声明的对象都是*不可变的*，它们在构造后无法修改。一开始看来这很奇怪，但它有几个优点：
 
-  * 它可以更高效。某些 struct 可以被高效地打包到数组中，并且在某些情况下，编译器可以完全避免分配不可变对象。
+  * 它可以更高效。某些 struct 可以被高效地打包到数组中，并且在某些情况下，编译器可以避免完全分配不可变对象。
   * 不可能违反由类型的构造函数提供的不变性。
   * 使用不可变对象的代码更容易推理。
 
@@ -366,7 +369,7 @@ julia> Point{AbstractString}
 Point{AbstractString}
 ```
 
-`Point{Float64}` 类型是坐标为 64 位浮点值的点，而 `Point{AbstractString}` 类型是「坐标」为字符串对象（请参阅 [Strings](@ref)）的「点」。
+`Point{Float64}` 类型是坐标为 64 位浮点值的点，而 `Point{AbstractString}` 类型是「坐标」为字符串对象（请参阅 [Strings](@id man-strings)）的「点」。
 
 `Point` 本身也是一个有效的类型对象，包括所有实例 `Point{Float64}`、`Point{AbstractString}` 等作为子类型：
 
@@ -403,10 +406,10 @@ false
 
 换成类型理论说法，Julia 的类型参数是*不变的*，而不是[协变的（或甚至是逆变的）](https://en.wikipedia.org/wiki/Covariance_and_contravariance_%28computer_science%29)。这是出于实际原因：虽然任何 `Point{Float64}` 的实例在概念上也可能像是 `Point{Real}` 的实例，但这两种类型在内存中有不同的表示：
 
-  * `Point{Float64}` 的实例可以紧凑而高效地表示为相近的一对 64 位值；
+  * `Point{Float64}` 的实例可以紧凑而高效地表示为一对 64 位立即数；
   * `Point{Real}` 的实例必须能够保存任何一对 [`Real`](@ref) 的实例。由于 `Real` 实例的对象可以具有任意的大小和结构，`Point{Real}` 的实例实际上必须表示为一对指向单独分配的 `Real` 对象的指针。
 
-在数组的情况下，能够以相近值存储 `Point{Float64}` 对象会极大地提高效率：`Array{Float64}` 可以存储为一段 64 位浮点值组成的连续内存块，而 `Array{Real}` 必须是一个由指向单独分配的 [`Real`](@ref) 的指针组成的数组——这可能是 [boxed](https://en.wikipedia.org/wiki/Object_type_%28object-oriented_programming%29#Boxing) 64 位浮点值，但也可能是任意庞大和复杂的对象，且其被声明为 `Real` 抽象类型的表示。
+在数组的情况下，能够以立即数存储 `Point{Float64}` 对象会极大地提高效率：`Array{Float64}` 可以存储为一段 64 位浮点值组成的连续内存块，而 `Array{Real}` 必须是一个由指向单独分配的 [`Real`](@ref) 的指针组成的数组——这可能是 [boxed](https://en.wikipedia.org/wiki/Object_type_%28object-oriented_programming%29#Boxing) 64 位浮点值，但也可能是任意庞大和复杂的对象，且其被声明为 `Real` 抽象类型的表示。
 
 由于 `Point{Float64}` 不是 `Point{Real}` 的子类型，下面的方法不适用于类型为 `Point{Float64}` 的参数：
 
@@ -689,7 +692,7 @@ julia> NamedTuple{(:a, :b)}((1,""))
 
 如果指定了字段类型，参数会被转换。否则，就直接使用参数的类型。
 
-#### [单态类型](@id man-singleton-types)
+### [单态类型](@id man-singleton-types)
 
 这里必须提到一种特殊的抽象类型：单态类型。对于每个类型 `T`，「单态类型」`Type{T}` 是个抽象类型且唯一的实例就是对象 `T`。由于定义有点难以解释，让我们看一些例子：
 
@@ -814,7 +817,7 @@ end
 
 当然，这依赖于 `Int` 的别名，但它被预定义成正确的类型—— [`Int32`](@ref) 或 [`Int64`](@ref)。
 
-（注意，与 `Int` 不同，`Float` 不作为特定大小的 [`AbstractFloat`](@ref) 类型的别名而存在。与整数寄存器不同，浮点数寄存器大小由 IEEE-754 标准指定。而 `Int` 的大小反映了该机器上本地指针的大小。）
+（注意，与 `Int` 不同，`Float` 不作为特定大小的 [`AbstractFloat`](@ref) 类型的别名而存在。与整数寄存器不同，浮点数寄存器大小由 IEEE-754 标准指定，而 `Int` 的大小反映了该机器上本地指针的大小。）
 
 ## 类型操作
 
@@ -834,9 +837,6 @@ false
 
 ```jldoctest
 julia> typeof(Rational{Int})
-DataType
-
-julia> typeof(Union{Real,Float64,Rational})
 DataType
 
 julia> typeof(Union{Real,String})
@@ -1005,7 +1005,7 @@ julia> [Polar(3, 4.0) Polar(4.0,5.3)]
 
 有关调整打印效果的常用属性列表，请参阅文档 [`IOContext`](@ref)。
 
-## 「值类型」
+## 值类型
 
 在 Julia 中，你无法根据诸如 `true` 或 `false` 之类的*值*进行分派。然而，你可以根据参数类型进行分派，Julia 允许你包含「plain bits」值（类型、符号、整数、浮点数和元组等）作为类型参数。`Array{T,N}` 里的维度参数就是一个常见的例子，在那里 `T` 是类型（比如 [`Float64`](@ref)），而 `N` 只是个 `Int`。
 
@@ -1039,6 +1039,9 @@ julia> firstlast(Val(false))
 
 为了保证 Julia 的一致性，调用处应当始终传递 `Val` *实例*而不是*类型*，也就是使用 `foo(Val(:bar))` 而不是 `foo(Val{:bar})`。
 
-值得注意的是，参数「值」类型非常容易被误用，包括 `Val`；情况不太好时，你很容易使代码性能变得更*糟糕*。特别是，你再也不会编写如上所示的实际代码。有关 `Val` 的正确（和不正确）使用的更多信息，请阅读[性能建议](@ref man-performance-tips)中更广泛的讨论。
+It's worth noting that it's extremely easy to mis-use parametric "value" types, including `Val`;
+in unfavorable cases, you can easily end up making the performance of your code much *worse*.
+ In particular, you would never want to write actual code as illustrated above.  For more information
+about the proper (and improper) uses of `Val`, please read [the more extensive discussion in the performance tips](@ref man-performance-value-type).
 
 [^1]: 「少数」由常数 `MAX_UNION_SPLITTING` 定义，目前设置为 4。

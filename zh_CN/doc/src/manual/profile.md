@@ -10,8 +10,7 @@
 
 尽管有这些限制，但抽样分析器仍然有很大的优势：
 
-  * 你无需对代码进行修改即可进行定时测量（这与替代的[注入型分析器](https://github.com/timholy/IProfile.jl)相反）。
-     
+  * You do not have to make any modifications to your code to take timing measurements.
   * 它可以分析 Julia 的核心代码，甚至（可选）可以分析 C 和 Fortran 库。
   * 通过「偶尔」运行，它只有很少的性能开销；代码在性能分析时能以接近本机的速度运行。
      
@@ -231,3 +230,29 @@ Profile.init(n = 10^7, delay = 0.01)
 为了逐行测量内存分配，启动 Julia 时请使用命令行选项 `--track-allocation=<setting>`，该选项的可选值有 `none`（默认值，不测量内存分配）、`user`（测量除 Julia core 代码之外的所有代码的内存分配）或 `all`（测量 Julia 代码中每一行的内存分配）。这会为每行已编译的代码测量内存。在退出 Julia 时，累积的结果将写入到文本文件中，此文本文件名称为该文件名称后加 `.mem`，并与源文件位于同一目录下。该文件的每行列出内存分配的总字节数。[`Coverage` 包](https://github.com/JuliaCI/Coverage.jl)包括了一些基本分析工具，例如，按照内存分配的字节数对行进行排序的工具。
 
 在解释结果时，有一些需要注意的细节。在 `user` 设定下，直接从 REPL 调用的任何函数的第一行都将会显示内存分配，这是由发生在 REPL 代码本身的事件造成的。更重要的是，JIT 编译也会添加内存分配计数，因为 Julia 的编译器大部分是用 Julia 编写的（并且编译通常需要内存分配）。建议的分析过程是先通过执行待分析的所有命令来强制编译，然后调用 [`Profile.clear_malloc_data()`](@ref) 来重置所有内存计数器。最后，执行所需的命令并退出 Julia 以触发 `.mem` 文件的生成。
+
+# 外部性能分析
+
+Julia 目前支持的外部性能分析工具有 `Intel VTune`、`OProfile` 和 `perf`。
+
+根据你所选择的工具，编译时请在 `Make.user` 中将 `USE_INTEL_JITEVENTS`、`USE_OPROFILE_JITEVENTS` 和 `USE_PERF_JITEVENTS` 设置为 1。多个上述编译标志是支持的。
+
+在运行 Julia 前，请将环境变量 `ENABLE_JITPROFILING` 设置为 1。
+
+现在，你可以通过多种方式使用这些工具！例如，可以使用 `OProfile` 来尝试做个简单的记录：
+
+```
+>ENABLE_JITPROFILING=1 sudo operf -Vdebug ./julia test/fastmath.jl
+>opreport -l `which ./julia`
+```
+
+或者类似地使用 `perf`：
+
+```
+$ ENABLE_JITPROFILING=1 perf record -o /tmp/perf.data --call-graph dwarf ./julia /test/fastmath.jl
+$ perf report --call-graph -G
+```
+
+你可以测量关于程序的更多有趣数据，若要获得详尽的列表，请阅读 [Linux perf 示例页面](http://www.brendangregg.com/perf.html)。
+
+请记住，perf 会为每次执行保存一个 `perf.data` 文件，即使对于小程序，它也可能变得非常大。此外，perf LLVM 模块会将调试对象保存在 `~/.debug/jit` 中，记得经常清理该文件夹。

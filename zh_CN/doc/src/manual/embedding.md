@@ -4,6 +4,8 @@
 
 ## 高级别嵌入
 
+__Note__: 本节包含可运行在类 Unix 系统上的、使用 C 编写的嵌入式 Julia 代码。Windows 平台请参阅下一节。
+
 我们从一个简单的 C 程序开始初始化 Julia 并调用一些 Julia 代码：
 
 ```c
@@ -108,6 +110,50 @@ all: embed_example
 
 现在构建的命令就只需要简简单单的`make`了。
 
+## 在 Windows 使用 Visual Studio 进行高级别嵌入
+
+If the `JULIA_DIR` environment variable hasn't been setup, add it using the System panel before
+starting Visual Studio. The `bin` folder under JULIA_DIR should be on the system PATH.
+
+We start by opening Visual Studio and creating a new Console Application project. To the 'stdafx.h'
+header file, add the following lines at the end:
+
+```c
+#include <julia.h>
+```
+
+Then, replace the main() function in the project with this code:
+
+```c
+int main(int argc, char *argv[])
+{
+    /* required: setup the Julia context */
+    jl_init();
+
+    /* run Julia commands */
+    jl_eval_string("print(sqrt(2.0))");
+
+    /* strongly recommended: notify Julia that the
+         program is about to terminate. this allows
+         Julia time to cleanup pending write requests
+         and run all finalizers
+    */
+    jl_atexit_hook(0);
+    return 0;
+}
+```
+
+The next step is to set up the project to find the Julia include files and the libraries. It's important to
+know whether the Julia installation is 32- or 64-bits. Remove any platform configuration that doesn't correspond
+to the Julia installation before proceeding.
+
+Using the project Properties dialog, go to `C/C++` | `General` and add `$(JULIA_DIR)\include\julia\` to the
+Additional Include Directories property. Then, go to the `Linker` | `General` section and add `$(JULIA_DIR)\lib`
+to the Additional Library Directories property. Finally, under `Linker` | `Input`, add `libjulia.dll.a;libopenlibm.dll.a;`
+to the list of libraries.
+
+At this point, the project should build and run.
+
 ## 转换类型
 
 真正的应用程序不仅仅要执行表达式，还要返回表达式的值给宿主程序。`jl_eval_string` 返回 一个 `jl_value_t*`，它是指向堆分配的 Julia 对象的指针。存储像 [`Float64`](@ref) 这些简单数据类型叫做 `装箱`，然后提取存储的基础类型数据叫 `拆箱`。我们改进的示例程序在 Julia 中计算 2 的平方根，并在 C 中读取回结果，如下所示：
@@ -174,11 +220,14 @@ JL_GC_PUSH1(&ret);
 JL_GC_POP();
 ```
 
-调用 `JL_GC_POP` 释放先前 `JL_GC_PUSH` 建立的引用。
-请注意 `JL_GC_PUSH` 正在堆栈上运行，所以在销毁堆栈之前它必须与之前的 `JL_GC_POP` 完全配对。
+The `JL_GC_POP` call releases the references established by the previous `JL_GC_PUSH`. Note that
+`JL_GC_PUSH` stores references on the C stack, so it must be exactly paired with a `JL_GC_POP`
+before the scope is exited. That is, before the function returns, or control flow otherwise
+leaves the block in which the `JL_GC_PUSH` was invoked.
 
-使用 `JL_GC_PUSH2`，`JL_GC_PUSH3` 和 `JL_GC_PUSH4` 宏可以一次 push 多个Julia 值。
-要推送一个 Julia值的数组，可以使用 `JL_GC_PUSHARGS` 宏，它的用法如下：
+Several Julia values can be pushed at once using the `JL_GC_PUSH2` , `JL_GC_PUSH3` , `JL_GC_PUSH4` ,
+`JL_GC_PUSH5` , and `JL_GC_PUSH6` macros. To push an array of Julia values one can use the
+`JL_GC_PUSHARGS` macro, which can be used as follows:
 
 ```c
 jl_value_t **args;
@@ -189,8 +238,101 @@ args[1] = some_other_value;
 JL_GC_POP();
 ```
 
-垃圾收集器也假设在这种情况下工作。即它知道每个老一代对象都指向年轻一代对象。
-每次更新指针时，都必须使用 `jl_gc_wb` (write barrier，写屏障) 函数将指针通知给收集器，如下所示：
+Each scope must have only one call to `JL_GC_PUSH*`. Hence, if all variables cannot be pushed once by
+a single call to `JL_GC_PUSH*`, or if there are more than 6 variables to be pushed and using an array
+of arguments is not an option, then one can use inner blocks:
+
+```c
+jl_value_t *ret1 = jl_eval_string("sqrt(2.0)");
+JL_GC_PUSH1(&ret1);
+jl_value_t *ret2 = 0;
+{
+    jl_function_t *func = jl_get_function(jl_base_module, "exp");
+    ret2 = jl_call1(func, ret1);
+    JL_GC_PUSH1(&ret2);
+    // Do something with ret2.
+    JL_GC_POP();    // This pops ret2.
+}
+JL_GC_POP();    // This pops ret1.
+```
+
+If it is required to hold the pointer to a variable between functions (or block scopes), then it is
+not possible to use `JL_GC_PUSH*`. In this case, it is necessary to create and keep a reference to the
+variable in the Julia global scope. One simple way to accomplish this is to use a global `IdDict` that
+will hold the references, avoiding deallocation by the GC. However, this method will only work
+properly with mutable types.
+
+```c
+// This functions shall be executed only once, during the initialization.
+jl_value_t* refs = jl_eval_string("refs = IdDict()");
+jl_function_t* setindex = jl_get_function(jl_base_module, "setindex!");
+
+...
+
+// `var` is the variable we want to protect between function calls.
+jl_value_t* var = 0;
+
+...
+
+// `var` is a `Vector{Float64}`, which is mutable.
+var = jl_eval_string("[sqrt(2.0); sqrt(4.0); sqrt(6.0)]");
+
+// To protect `var`, add its reference to `refs`.
+jl_call3(setindex, refs, var, var);
+```
+
+If the variable is immutable, then it needs to be wrapped in an equivalent mutable container or,
+preferably, in a `RefValue{Any}` before it is pushed to `IdDict`. In this approach, the container has
+to be created or filled in via C code using, for example, the function `jl_new_struct`. If the
+container is created by `jl_call*`, then you will need to reload the pointer to be used in C code.
+
+```c
+// This functions shall be executed only once, during the initialization.
+jl_value_t* refs = jl_eval_string("refs = IdDict()");
+jl_function_t* setindex = jl_get_function(jl_base_module, "setindex!");
+jl_datatype_t* reft = (jl_datatype_t*)jl_eval_string("Base.RefValue{Any}");
+
+...
+
+// `var` is the variable we want to protect between function calls.
+jl_value_t* var = 0;
+
+...
+
+// `var` is a `Float64`, which is immutable.
+var = jl_eval_string("sqrt(2.0)");
+
+// Protect `var` until we add its reference to `refs`.
+JL_GC_PUSH1(&var);
+
+// Wrap `var` in `RefValue{Any}` and push to `refs` to protect it.
+jl_value_t* rvar = jl_new_struct(reft, var);
+JL_GC_POP();
+
+jl_call3(setindex, refs, rvar, rvar);
+```
+
+The GC can be allowed to deallocate a variable by removing the reference to it from `refs` using
+the function `delete!`, provided that no other reference to the variable is kept anywhere:
+
+```c
+jl_function_t* delete = jl_get_function(jl_base_module, "delete!");
+jl_call2(delete, refs, rvar);
+```
+
+As an alternative for very simple cases, it is possible to just create a global container of type
+`Vector{Any}` and fetch the elements from that when necessary, or even to create one global variable
+per pointer using
+
+```c
+jl_set_global(jl_main_module, jl_symbol("var"), var);
+```
+
+### Updating fields of GC-managed objects
+
+The garbage collector operates under the assumption that it is aware of every old-generation
+object pointing to a young-generation one. Any time a pointer is updated breaking that assumption,
+it must be signaled to the collector with the `jl_gc_wb` (write barrier) function like so:
 
 ```c
 jl_value_t *parent = some_old_value, *child = some_young_value;

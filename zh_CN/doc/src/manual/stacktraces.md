@@ -172,6 +172,50 @@ ERROR: Whoops!
 [...]
 ```
 
+## 异常栈与`catch_stack`
+
+!!! compat "Julia 1.1"
+    异常栈需要 Julia 1.1 及以上版本。
+
+在处理一个异常时，后续的异常同样可能被抛出。观察这些异常对定位问题的源头极有帮助。Julia runtime 支持将每个异常发生后推入一个内部的*异常栈*。当代码正常退出一个`catch`语句，可认为所有被推入栈中的异常在相应的`try`语句中被成功处理并已从栈中移除。
+
+存放当前异常的栈可通过测试函数 [`Base.catch_stack`](@ref) 获取，例如
+
+```julia-repl
+julia> try
+           error("(A) The root cause")
+       catch
+           try
+               error("(B) An exception while handling the exception")
+           catch
+               for (exc, bt) in Base.catch_stack()
+                   showerror(stdout, exc, bt)
+                   println()
+               end
+           end
+       end
+(A) The root cause
+Stacktrace:
+ [1] error(::String) at error.jl:33
+ [2] top-level scope at REPL[7]:2
+ [3] eval(::Module, ::Any) at boot.jl:319
+ [4] eval_user_input(::Any, ::REPL.REPLBackend) at REPL.jl:85
+ [5] macro expansion at REPL.jl:117 [inlined]
+ [6] (::getfield(REPL, Symbol("##26#27")){REPL.REPLBackend})() at task.jl:259
+(B) An exception while handling the exception
+Stacktrace:
+ [1] error(::String) at error.jl:33
+ [2] top-level scope at REPL[7]:5
+ [3] eval(::Module, ::Any) at boot.jl:319
+ [4] eval_user_input(::Any, ::REPL.REPLBackend) at REPL.jl:85
+ [5] macro expansion at REPL.jl:117 [inlined]
+ [6] (::getfield(REPL, Symbol("##26#27")){REPL.REPLBackend})() at task.jl:259
+```
+
+在本例中，根源异常（A）排在栈头，其后放置着延伸异常（B)。 在正常退出（例如，不抛出新异常）两个 catch 块后，所有异常都被移除出栈，无法访问。
+
+异常栈被存放于发生异常的 `Task` 处。当某个任务失败，出现意料外的异常时，`catch_stack(task)` 可能会被用于观察该任务的异常栈。
+
 ## [`stacktrace`](@ref) 与 [`backtrace`](@ref) 的比较
 
 调用 [`backtrace`](@ref) 会返回一个 `Union{Ptr{Nothing}, Base.InterpreterIP}` 的数组，可以将其传给 [`stacktrace`](@ref) 函数进行转化：
@@ -202,7 +246,7 @@ julia> stacktrace(trace)
  (::getfield(REPL, Symbol("##28#29")){REPL.REPLBackend})() at event.jl:92
 ```
 
-需要注意的是，[`backtrace`](@ref) 返回的数组有 18 个元素，而经过 [`stacktrace`](@ref) 转化后仅剩 6 个。这是因为 [`stacktrace`](@ref) 在默认情况下会移除所有底层 C 函数的栈信息。如果你想显示 C 函数调用的栈帧，可以这样做：
+需要注意的是，[`backtrace`](@ref) 返回的向量有 18 个元素，而 [`stacktrace`](@ref) 返回的向量只包含6 个元素。这是因为 [`stacktrace`](@ref) 在默认情况下会移除所有底层 C 函数的栈信息。如果你想显示 C 函数调用的栈帧，可以这样做：
 
 ```julia-repl
 julia> stacktrace(trace, true)
@@ -230,7 +274,7 @@ julia> stacktrace(trace, true)
  ip:0xffffffffffffffff
 ```
 
-我们也可以将 [`backtrace`](@ref) 返回的单个指针传递给[`StackTraces.lookup`](@ref) 来转化成 [`StackTraces.StackFrame`](@ref)：
+[`backtrace`](@ref) 返回的单个指针可以通过 [`StackTraces.lookup`](@ref) 来转化成一组 [`StackTraces.StackFrame`](@ref)：
 
 ```julia-repl
 julia> pointer = backtrace()[1];
@@ -242,4 +286,3 @@ julia> frame = StackTraces.lookup(pointer)
 julia> println("The top frame is from $(frame[1].func)!")
 The top frame is from jl_apply_generic!
 ```
-

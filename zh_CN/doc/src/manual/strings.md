@@ -68,7 +68,9 @@ julia> isvalid(Char, 0x110000)
 false
 ```
 
-目前，有效的 Unicode 代码为，从 `U+00` 至 `U+d7ff`，以及从 `U+e000` 至 `U+10ffff`。它们还未全部被赋予明确的含义，也还没必要被应用解释；然而，所有的这些值都被认为是有效的 Unicode 字符。
+As of this writing, the valid Unicode code points are `U+0000` through `U+D7FF` and `U+E000` through
+`U+10FFFF`. These have not all been assigned intelligible meanings yet, nor are they necessarily
+interpretable by applications, but all of these values are considered to be valid Unicode characters.
 
 你可以在单引号中输入任何 Unicode 字符，通过使用 `\u` 加上至多 ４ 个十六进制数字或者 `\U` 加上至多 ８ 个十六进制数（最长的有效值也只需要 6 个）：
 
@@ -83,7 +85,7 @@ julia> '\u2200'
 '∀': Unicode U+2200 (category Sm: Symbol, math)
 
 julia> '\U10ffff'
-'\U10ffff': Unicode U+10ffff (category Cn: Other, not assigned)
+'\U10ffff': Unicode U+10FFFF (category Cn: Other, not assigned)
 ```
 
 Julia 使用系统默认的区域和语言设置来确定，哪些字符可以被正确显示，哪些需要用 `\u` 或 `\U` 的转义来显示。除 Unicode 转义格式之外，还可以使用所有的[传统 C 语言转义输入形式](https://en.wikipedia.org/wiki/C_syntax#Backslash_escapes)：
@@ -139,43 +141,51 @@ julia> """Contains "quote" characters"""
 "Contains \"quote\" characters"
 ```
 
-如果想从字符串中提取字符, 可以通过索引字符串的方式来获取：
+If you want to extract a character from a string, you index into it:
 
 ```jldoctest helloworldstring
+julia> str[begin]
+'H': ASCII/Unicode U+0048 (category Lu: Letter, uppercase)
+
 julia> str[1]
 'H': ASCII/Unicode U+0048 (category Lu: Letter, uppercase)
 
 julia> str[6]
-',': ASCII/Unicode U+002c (category Po: Punctuation, other)
+',': ASCII/Unicode U+002C (category Po: Punctuation, other)
 
 julia> str[end]
-'\n': ASCII/Unicode U+000a (category Cc: Other, control)
+'\n': ASCII/Unicode U+000A (category Cc: Other, control)
 ```
 
-包括字符串，许多的 Julia 对象都可以用整数进行索引。第一个元素的索引由 [`firstindex(str)`](@ref) 返回，最后一个由 [`lastindex(str)`](@ref) 返回。关键字 `end` 可以在索引操作中用作给定维度的最后一个索引。在 Julia 中，大多数索引都是从 1 开始的：许多整数索引的对象的第一个元素都在索引为 1 处。（下面我们将会看到，这并不一定意味着最后一个元素位于索引为 `n` 处——`n` 为此字符串的长度。）
+Many Julia objects, including strings, can be indexed with integers. The index of the first
+element (the first character of a string) is returned by [`firstindex(str)`](@ref), and the index of the last element (character)
+with [`lastindex(str)`](@ref). The keywords `begin` and `end` can be used inside an indexing
+operation as shorthand for the first and last indices, respectively, along the given dimension.
+String indexing, like most indexing in Julia, is 1-based: `firstindex` always returns `1` for any `AbstractString`.
+As we will see below, however, `lastindex(str)` is *not* in general the same as `length(str)` for a string,
+because some Unicode characters can occupy multiple "code units".
 
 你可以用 [`end`](@ref) 进行算术以及其它操作，就像普通值一样：
 
 ```jldoctest helloworldstring
 julia> str[end-1]
-'.': ASCII/Unicode U+002e (category Po: Punctuation, other)
+'.': ASCII/Unicode U+002E (category Po: Punctuation, other)
 
 julia> str[end÷2]
 ' ': ASCII/Unicode U+0020 (category Zs: Separator, space)
 ```
 
-使用小于 1 或大于 `end` 的索引会引发错误：
+Using an index less than `begin` (`1`) or greater than `end` raises an error:
 
 ```jldoctest helloworldstring
-julia> str[0]
-ERROR: BoundsError: attempt to access "Hello, world.\n"
+julia> str[begin-1]
+ERROR: BoundsError: attempt to access String
   at index [0]
 [...]
 
 julia> str[end+1]
-ERROR: BoundsError: attempt to access "Hello, world.\n"
+ERROR: BoundsError: attempt to access String
   at index [15]
-Stacktrace:
 [...]
 ```
 
@@ -186,11 +196,11 @@ julia> str[4:9]
 "lo, wo"
 ```
 
-注意表达式 `str[k]` 和 `str[k:k]` 并没有给出相同的结果
+Notice that the expressions `str[k]` and `str[k:k]` do not give the same result:
 
 ```jldoctest helloworldstring
 julia> str[6]
-',': ASCII/Unicode U+002c (category Po: Punctuation, other)
+',': ASCII/Unicode U+002C (category Po: Punctuation, other)
 
 julia> str[6:6]
 ","
@@ -222,7 +232,17 @@ julia> s = "\u2200 x \u2203 y"
 "∀ x ∃ y"
 ```
 
-这些 Unicode 字符是作为转义还是特殊字符显示取决于你终端的语言环境设置以及它对 Unicode 的支持。字符串字面量用 UTF-8 编码实现编码。UTF-8 是一种可变宽度的编码，也就是说并非所有字符都以相同的字节数被编码。在 UTF-8 中，ASCII 字符——小于 0x80(128) 的那些——如它们在 ASCII 中一样使用单字节编码；而 0x80 及以上的字符使用最多 4 个字节编码。这意味着并非每个索引到 UTF-8 字符串的字节都必须是一个字符的有效索引。如果在这种无效字节索引处索引字符串，将会报错：
+Whether these Unicode characters are displayed as escapes or shown as special characters depends
+on your terminal's locale settings and its support for Unicode. String literals are encoded using
+the UTF-8 encoding. UTF-8 is a variable-width encoding, meaning that not all characters are encoded
+in the same number of bytes ("code units"). In UTF-8, ASCII characters — i.e. those with code points less than
+0x80 (128) -- are encoded as they are in ASCII, using a single byte, while code points 0x80 and
+above are encoded using multiple bytes — up to four per character.
+
+String indices in Julia refer to code units (= bytes for UTF-8), the fixed-width building blocks that
+are used to encode arbitrary characters (code points). This means that not every
+index into a `String` is necessarily a valid index for a character. If you index into
+a string at such an invalid byte index, an error is thrown:
 
 ```jldoctest unicodestring
 julia> s[1]
@@ -243,7 +263,28 @@ julia> s[4]
 
 在这种情况下，字符 `∀` 是一个三字节字符，因此索引 2 和 3 都是无效的，而下一个字符的索引是 4；这个接下来的有效索引可以用 [`nextind(s,1)`](@ref) 来计算，再接下来的用 `nextind(s,4)`，依此类推。
 
-使用范围索引提取字字符串也需要有效的字节索引，否则将报错：
+Since `end` is always the last valid index into a collection, `end-1` references an invalid
+byte index if the second-to-last character is multibyte.
+
+```jldoctest unicodestring
+julia> s[end-1]
+' ': ASCII/Unicode U+0020 (category Zs: Separator, space)
+
+julia> s[end-2]
+ERROR: StringIndexError("∀ x ∃ y", 9)
+Stacktrace:
+[...]
+
+julia> s[prevind(s, end, 2)]
+'∃': Unicode U+2203 (category Sm: Symbol, math)
+```
+
+The first case works, because the last character `y` and the space are one-byte characters,
+whereas `end-2` indexes into the middle of the `∃` multibyte representation. The correct
+way for this case is using `prevind(s, lastindex(s), 2)` or, if you're using that value to index
+into `s` you can write `s[prevind(s, end, 2)]` and `end` expands to `lastindex(s)`.
+
+Extraction of a substring using range indexing also expects valid byte indices or an error is thrown:
 
 ```jldoctest unicodestring
 julia> s[1:1]
@@ -258,7 +299,12 @@ julia> s[1:4]
 "∀ "
 ```
 
-由于可变长度的编码，字符串中的字符数（由 [`length(s)`](@ref) 给出）并不总是等于最后一个索引的数字。如果你从 1 到 [`lastindex(s)`](@ref) 迭代并索引到 `s`，未报错时返回的字符序列是包含字符串 `s` 的字符序列。因此总有 `length(s) <= lastindex(s)`，这是因为字符串中的每个字符必须有它自己的索引。下面是对 `s` 的字符进行迭代的一个冗长而低效的方式：
+Because of variable-length encodings, the number of characters in a string (given by [`length(s)`](@ref))
+is not always the same as the last index. If you iterate through the indices 1 through [`lastindex(s)`](@ref)
+and index into `s`, the sequence of characters returned when errors aren't thrown is the sequence
+of characters comprising the string `s`. Thus we have the identity that `length(s) <= lastindex(s)`,
+since each character in a string must have its own index. The following is an inefficient and
+verbose way to iterate through the characters of `s`:
 
 ```jldoctest unicodestring
 julia> for i = firstindex(s):lastindex(s)
@@ -277,7 +323,9 @@ x
 y
 ```
 
-空行上面其实是有空格的。幸运的是，上面的笨拙写法不是对字符串中字符进行迭代所必须的——因为你只需把字符串本身用作迭代对象，而不需要额外处理：
+The blank lines actually have spaces on them. Fortunately, the above awkward idiom is unnecessary
+for iterating through the characters in a string, since you can just use the string as an iterable
+object, no exception handling required:
 
 ```jldoctest unicodestring
 julia> for c in s
@@ -292,7 +340,31 @@ x
 y
 ```
 
-Julia 中的字符串可以包含无效的 UTF-8 代码单元序列。这个惯例允许把任何字序列当作 `String`。在这种情形下的一个规则是，当从左到右解析代码单元序列时，字符由匹配下面开头位模式之一的最长的 8 位代码单元序列组成（每个 `x` 可以是 `0` 或者 `1`）：
+If you need to obtain valid indices for a string, you can use the [`nextind`](@ref) and
+[`prevind`](@ref) functions to increment/decrement to the next/previous valid index, as mentioned above.
+You can also use the [`eachindex`](@ref) function to iterate over the valid character indices:
+
+```jldoctest unicodestring
+julia> collect(eachindex(s))
+7-element Array{Int64,1}:
+  1
+  4
+  5
+  6
+  7
+ 10
+ 11
+```
+
+To access the raw code units (bytes for UTF-8) of the encoding, you can use the [`codeunit(s,i)`](@ref)
+function, where the index `i` runs consecutively from `1` to [`ncodeunits(s)`](@ref).  The [`codeunits(s)`](@ref)
+function returns an `AbstractVector{UInt8}` wrapper that lets you access these raw codeunits (bytes) as an array.
+
+Strings in Julia can contain invalid UTF-8 code unit sequences. This convention allows to
+treat any byte sequence as a `String`. In such situations a rule is that when parsing
+a sequence of code units from left to right characters are formed by the longest sequence of
+8-bit code units that matches the start of one of the following bit patterns
+(each `x` can be `0` or `1`):
 
 * `0xxxxxxx`;
 * `110xxxxx` `10xxxxxx`;
@@ -301,7 +373,9 @@ Julia 中的字符串可以包含无效的 UTF-8 代码单元序列。这个惯�
 * `10xxxxxx`;
 * `11111xxx`.
 
-特别地，这意味着过长和太高的代码单元序列也可接受。这个规则最好用一个例子来解释：
+In particular this means that overlong and too-high code unit sequences and prefixes thereof are treated
+as a single invalid character rather than multiple invalid characters.
+This rule may be best explained with an example:
 
 ```julia-repl
 julia> s = "\xc0\xa0\xe2\x88\xe2|"
@@ -311,28 +385,27 @@ julia> foreach(display, s)
 '\xc0\xa0': [overlong] ASCII/Unicode U+0020 (category Zs: Separator, space)
 '\xe2\x88': Malformed UTF-8 (category Ma: Malformed, bad data)
 '\xe2': Malformed UTF-8 (category Ma: Malformed, bad data)
-'|': ASCII/Unicode U+007c (category Sm: Symbol, math)
+'|': ASCII/Unicode U+007C (category Sm: Symbol, math)
 
 julia> isvalid.(collect(s))
 4-element BitArray{1}:
- false
- false
- false
-  true
+ 0
+ 0
+ 0
+ 1
 
 julia> s2 = "\xf7\xbf\xbf\xbf"
 "\U1fffff"
 
 julia> foreach(display, s2)
-'\U1fffff': Unicode U+1fffff (category In: Invalid, too high)
+'\U1fffff': Unicode U+1FFFFF (category In: Invalid, too high)
 ```
 
 我们可以看到字符串 `s` 中的前两个代码单元形成了一个过长的空格字符编码。这是无效的，但是在字符串中作为单个字符是可以接受的。接下来的两个代码单元形成了一个有效的 3 位 UTF-8 序列开头。然而，第五个代码单元 `\xe2` 不是它的有效延续，所以代码单元 3 和 4 在这个字符串中也被解释为格式错误的字符。同理，由于 `|` 不是它的有效延续，代码单元 5 形成了一个格式错误的字符。最后字符串 `s2` 包含了一个太高的代码。
 
-Julia 默认使用 UTF-8 编码，对于新编码的支持可以通过包加上。例如，[LegacyStrings.jl](https://github.com/JuliaArchive/LegacyStrings.jl) 包实现了 `UTF16String` 和 `UTF32String` 类型。关于其它编码的额外讨论以及如何实现对它们的支持暂时超过了这篇文档的讨论范围。UTF-8 编码相关问题的进一步讨论参见下面的[字节数组字面量](@ref)章节。[`transcode`](@ref) 函数可在各种 UTF-xx 编码之间转换，主要用于外部数据和包。
+Julia 默认使用 UTF-8 编码，对于新编码的支持可以通过包加上。例如，[LegacyStrings.jl](https://github.com/JuliaStrings/LegacyStrings.jl) 包实现了 `UTF16String` 和 `UTF32String` 类型。关于其它编码的额外讨论以及如何实现对它们的支持暂时超过了这篇文档的讨论范围。UTF-8 编码相关问题的进一步讨论参见下面的[字节数组字面量](@ref man-byte-array-literals)章节。[`transcode`](@ref) 函数可在各种 UTF-xx 编码之间转换，主要用于外部数据和包。
 
-
-## 级联
+## [拼接](@id man-concatenation)
 
 最常见最有用的字符串操作是级联：
 
@@ -378,16 +451,15 @@ julia> greet * ", " * whom * ".\n"
 "Hello, world.\n"
 ```
 
-尽管对于提供 `+` 函数用于字符串串联的语言使用者而言，`*` 似乎是一个令人惊讶的选择，但 `*` 的这种用法在数学中早有先例，尤其是在抽象代数中。
+尽管对于提供 `+` 函数用于字符串拼接的语言使用者而言，`*` 似乎是一个令人惊讶的选择，但 `*` 的这种用法在数学中早有先例，尤其是在抽象代数中。
 
-在数学上，`+` 通常表示可交换运算（*commutative* operation）——运算对象的顺序不重要。一个例子是矩阵加法：对于任何形状相同的矩阵 `A` 和 `B`，都有 `A + B == B + A`。与之相反，`＊` 通常表示不可交换运算——运算对象的顺序很重要。例如，对于矩阵乘法，一般 `A * B != B * A`。同矩阵乘法类似，字符串串联是非对易的：`greet * whom != whom * greet`。在这一点上，对于插入字符串的串联操作，`*` 是一个自然而然的选择，与它在数学中的用法一致。
+在数学上，`+` 通常表示可交换运算（*commutative* operation）——运算对象的顺序不重要。一个例子是矩阵加法：对于任何形状相同的矩阵 `A` 和 `B`，都有 `A + B == B + A`。与之相反，`*` 通常表示不可交换运算——运算对象的顺序很重要。例如，对于矩阵乘法，一般 `A * B != B * A`。同矩阵乘法类似，字符串拼接是不可交换的：`greet * whom != whom * greet`。在这一点上，对于插入字符串的拼接操作，`*` 是一个自然而然的选择，与它在数学中的用法一致。
 
-
-更确切地说，有限长度字符串集合 *S* 和字符串级联操作 `*` 构成了一个自由群 (*S*, `*`)。该集合的单位元是空字符串，`""`。当一个自由群非对易时，它的运算通常表示为 `\cdot`，`*`，或者类似的符号，而非暗示对易性的 `+`。
+更确切地说，有限长度字符串集合 *S* 和字符串拼接操作 `*` 构成了一个[自由幺半群](https://en.wikipedia.org/wiki/Free_monoid) (*S*, `*`)。该集合的单位元是空字符串，`""`。当一个自由幺半群不是交换的时，它的运算通常表示为 `\cdot`，`*`，或者类似的符号，而非暗示交换性的 `+`。
 
 ## [插值](@id string-interpolation)
 
-级联构造字符串的方式有时有些麻烦。为了减少对于 [`string`](@ref) 的冗余调用或者重复地做乘法，Julia 允许像 Perl 中一样使用 `$` 对字符串字面量进行插值：
+拼接构造字符串的方式有时有些麻烦。为了减少对于 [`string`](@ref) 的冗余调用或者重复地做乘法，Julia 允许像 Perl 中一样使用 `$` 对字符串字面量进行插值：
 
 
 ```jldoctest stringconcat
@@ -395,8 +467,8 @@ julia> "$greet, $whom.\n"
 "Hello, world.\n"
 ```
 
-这更易读更方便，而且等效于上面的字符串串联——系统把这个显然一行的字符串字面量重写成带参数的字符串字面量串联。
-
+This is more readable and convenient and equivalent to the above string concatenation -- the system
+rewrites this apparent single string literal into the call `string(greet, ", ", whom, ".\n")`.
 
 在 `$` 之后最短的完整表达式被视为插入其值于字符串中的表达式。因此，你可以用括号向字符串中插入任何表达式：
 
@@ -406,7 +478,12 @@ julia> "1 + 2 = $(1 + 2)"
 "1 + 2 = 3"
 ```
 
-级联和插值都调用 [`string`](@ref) 以转换对象为字符串形式。多数非 `AbstractString` 对象被转换为和它们作为文本表达式输入的方式密切对应的字符串：
+Both concatenation and string interpolation call [`string`](@ref) to convert objects into string
+form. However, `string` actually just returns the output of [`print`](@ref), so new types
+should add methods to [`print`](@ref) or [`show`](@ref) instead of `string`.
+
+Most non-`AbstractString` objects are converted to strings closely corresponding to how
+they are entered as literal expressions:
 
 ```jldoctest
 julia> v = [1,2,3]
@@ -516,19 +593,19 @@ julia> "1 + 2 = 3" == "1 + 2 = $(1 + 2)"
 true
 ```
 
-你可以使用 [`findfirst`](@ref) 函数搜索特定字符的索引：
+你可以使用 [`findfirst`](@ref) 与 [`findlast`](@ref) 函数搜索特定字符的索引：
 
 ```jldoctest
-julia> findfirst(isequal('x'), "xylophone")
-1
+julia> findfirst(isequal('o'), "xylophone")
+4
 
-julia> findfirst(isequal('p'), "xylophone")
-5
+julia> findlast(isequal('o'), "xylophone")
+7
 
 julia> findfirst(isequal('z'), "xylophone")
 ```
 
-你可以带上第三个参数，用 [`findnext`](@ref) 函数在给定偏移量处搜索字符。
+你可以带上第三个参数，用 [`findnext`](@ref) 与 [`findprev`](@ref) 函数来在给定偏移量处搜索字符：
 
 ```jldoctest
 julia> findnext(isequal('o'), "xylophone", 1)
@@ -536,6 +613,9 @@ julia> findnext(isequal('o'), "xylophone", 1)
 
 julia> findnext(isequal('o'), "xylophone", 5)
 7
+
+julia> findprev(isequal('o'), "xylophone", 5)
+4
 
 julia> findnext(isequal('o'), "xylophone", 8)
 ```
@@ -575,7 +655,7 @@ julia> join(["apples", "bananas", "pineapples"], ", ", " and ")
   * [`lastindex(str)`](@ref) 给出可用来索引到 `str` 的最大（字节）索引。
   * [`length(str)`](@ref)，`str` 中的字符个数。
   * [`length(str, i, j)`](@ref)，`str` 中从 `i` 到 `j` 的有效字符索引个数。
-  * [`ncodeunits(str)`](@ref)，字符串中[代码单元](https://en.wikipedia.org/wiki/Character_encoding#Terminology)的数目。
+  * [`ncodeunits(str)`](@ref)，字符串中[代码单元](https://en.wikipedia.org/wiki/Character_encoding#Terminology)（[码元](https://zh.wikipedia.org/wiki/字符编码#字符集、代码页，与字符映射)）的数目。
   * [`codeunit(str, i)`](@ref) 给出在字符串 `str` 中索引为 `i` 的代码单元值。
   * [`thisind(str, i)`](@ref)，给定一个字符串的任意索引，查找索引点所在的首个索引。
   * [`nextind(str, i, n=1)`](@ref) 查找在索引 `i` 之后第 `n` 个字符的开头。
@@ -583,11 +663,17 @@ julia> join(["apples", "bananas", "pineapples"], ", ", " and ")
 
 ## 非标准字符串字面量
 
-有时当你想构造字符串或者使用字符串语义，标准的字符串构造却不能很好的满足需求。Julia 为这种情形提供了[非标准字符串字面量](@ref)。非标准字符串字面量看似常规双引号字符串字面量，但却直接加上了标识符前缀因而并不那么像普通的字符串字面量。下面将提到，正则表达式，字节数组字面量和版本号字面量都是非标准字符串字面量的例子。其它例子见[元编程](@ref)章。
+有时当你想构造字符串或者使用字符串语义，标准的字符串构造却不能很好的满足需求。Julia 为这种情形提供了非标准字符串字面量。非标准字符串字面量看似常规双引号字符串字面量，但却直接加上了标识符前缀因而并不那么像普通的字符串字面量。下面将提到，正则表达式，字节数组字面量和版本号字面量都是非标准字符串字面量的例子。其它例子见[元编程](@ref)章。
 
 ## 正则表达式
 
-Julia 具有与 Perl 兼容的正则表达式 (regexes)，就像 [PCRE](http://www.pcre.org/) 包所提供的那样。正则表达式以两种方式和字符串相关：一个显然的关联是，正则表达式被用于找到字符串中的正则模式；另一个关联是，正则表达式自身就是作为字符串输入，它们被解析到可用来高效搜索字符串中模式的状态机中。在 Julia 中正则表达式的输入使用了前缀各类以 `r` 开头的标识符的非标准字符串字面量。最基本的不打开任何选项的正则表达式只用到了 `r"..."`：
+Julia has Perl-compatible regular expressions (regexes), as provided by the [PCRE](http://www.pcre.org/)
+library (a description of the syntax can be found [here](http://www.pcre.org/current/doc/html/pcre2syntax.html)). Regular expressions are related to strings in two ways: the obvious connection is that
+regular expressions are used to find regular patterns in strings; the other connection is that
+regular expressions are themselves input as strings, which are parsed into a state machine that
+can be used to efficiently search for patterns in strings. In Julia, regular expressions are input
+using non-standard string literals prefixed with various identifiers beginning with `r`. The most
+basic regular expression literal without any options turned on just uses `r"..."`:
 
 ```jldoctest
 julia> r"^\s*(?:#|$)"
@@ -721,7 +807,7 @@ julia> m[2]
 "45"
 ```
 
-使用 [`replace`](@ref) 时利用 `\n` 引用第 n 个捕获组和给替换字符串加上 `s` 的前缀，可以实现替换字符串中对捕获的引用。捕获组 0 指的是整个匹配对象。可在替换中用 `g<groupname>` 对命名捕获组进行引用。例如：
+使用 [`replace`](@ref) 时利用 `\n` 引用第 n 个捕获组和给替换字符串加上 `s` 的前缀，可以实现替换字符串中对捕获的引用。捕获组 0 指的是整个匹配对象。可在替换中用 `\g<groupname>` 对命名捕获组进行引用。例如：
 
 ```jldoctest
 julia> replace("first second", r"(\w+) (?<agroup>\w+)" => s"\g<agroup> \1")
@@ -781,6 +867,33 @@ ERROR: syntax: invalid escape sequence
 ```
 
 Julia 也支持 `r"""..."""` 形式的三引号正则表达式字符串（或许便于处理包含引号和换行符的正则表达式）。
+
+`Regex()` 构造函数可以用于以编程方式创建合法的正则表达式字符串。这允许在构造正则表达式字符串时使用字符串变量的内容和其他字符串操作。上面的任何正则表达式代码可以在 `Regex()` 的单字符串参数中使用。下面是一些例子：
+
+```jldoctest
+julia> using Dates
+
+julia> d = Date(1962,7,10)
+1962-07-10
+
+julia> regex_d = Regex("Day " * string(day(d)))
+r"Day 10"
+
+julia> match(regex_d, "It happened on Day 10")
+RegexMatch("Day 10")
+
+julia> name = "Jon"
+"Jon"
+
+julia> regex_name = Regex("[\"( ]$name[\") ]")  # 插入 name 的值
+r"[\"( ]Jon[\") ]"
+
+julia> match(regex_name," Jon ")
+RegexMatch(" Jon ")
+
+julia> match(regex_name,"[Jon]") === nothing
+true
+```
 
 ## 字节数组字面量
 
@@ -854,15 +967,15 @@ julia> b"\uff"
 
 如果这些还是太难理解，试着读一下 ["每个软件开发人员绝对必须知道的最基础 Unicode 和字符集知识"](https://www.joelonsoftware.com/2003/10/08/the-absolute-minimum-every-software-developer-absolutely-positively-must-know-about-unicode-and-character-sets-no-excuses/)。它是一个优质的 Unicode 和 UTF-8 指南，或许能帮助解除一些这方面的疑惑。
 
-## 版本号字面量
+## [版本号字面量](@id man-version-number-literals)
 
-版本号很容易用 [`v"..."`](@ref) 形式的非标准字符串字面量表示。版本号字面量生成遵循[语义版本](http://semver.org)规范的 [`VersionNumber`](@ref) 对象，因此由主、次、补丁号构成，后跟预发行 (pre-release) 和生成阿尔法数注释 (build alpha-numeric)。例如，`v"0.2.1-rc1+win64"` 可分为主版本号 `0`，次版本号 `2`，补丁版本号 `1`，预发行版号 `rc1`，以及生成版本 `win64`。输入版本字面量时，除了主版本号以外所有内容都是可选的，因此 `v"0.2"` 等效于 `v"0.2.0"` (预发行号和生成注释为空), `v"2"` 等效于 `v"2.0.0"`，等等。
+版本号很容易用 [`v"..."`](@ref) 形式的非标准字符串字面量表示。版本号字面量生成遵循[语义版本](https://semver.org/)规范的 [`VersionNumber`](@ref) 对象，因此由主、次、补丁号构成，后跟预发行 (pre-release) 和生成阿尔法数注释（build alpha-numeric）。例如，`v"0.2.1-rc1+win64"` 可分为主版本号 `0`，次版本号 `2`，补丁版本号 `1`，预发行版号 `rc1`，以及生成版本 `win64`。输入版本字面量时，除了主版本号以外所有内容都是可选的，因此 `v"0.2"` 等效于 `v"0.2.0"`（预发行号和生成注释为空），`v"2"` 等效于 `v"2.0.0"`，等等。
 
 `VersionNumber` 对象在轻松正确地比较两个（或更多）版本时非常有用。例如，常数 `VERSION` 把 Julia 的版本号保留为一个 `VersionNumber` 对象，因此可以像下面这样用简单的声明定义一些特定版本的行为：
 
 ```julia
 if v"0.2" <= VERSION < v"0.3-"
-    # do something specific to 0.2 release series
+    # 针对 0.2 发行版系列做些事情
 end
 ```
 
@@ -872,9 +985,9 @@ end
 
 在比较中使用这样的特殊版本是个好办法（特别是，总是应该对高版本使用尾随 `-`，除非有好理由不这样），但它们不应该被用作任何内容的实际版本，因为它们在语义版本控制方案中无效。
 
-除了用于常数 [`VERSION`](@ref)，c 对象在 `Pkg` 模块中被广泛用于指定包版本和其依赖。
+除了用于定义常数 [`VERSION`](@ref)，`VersionNumber` 对象在 `Pkg` 模块应用广泛，常用于指定软件包的版本及其依赖。
 
-## 原始字符串字面量
+## [原始字符串字面量](@id man-raw-string-literals)
 
 无插值和非转义的原始字符串可用 `raw"..."` 形式的非标准字符串字面量表示。原始字符串字面量生成普通的 `String` 对象，它无需插值和非转义地包含和输入完全一样的封闭式内容。这对于包含其他语言中使用 "$" 或 "\" 作为特殊字符的代码或标记的字符串很有用。
 
